@@ -1,109 +1,97 @@
 """
-INTENTIONALLY VULNERABLE Python file for Secara testing.
-
-⚠️  DO NOT USE IN PRODUCTION — Contains deliberate security vulnerabilities ⚠️
-This file is used to verify that Secara correctly detects real issues.
+Intentionally vulnerable Python samples for testing ALL new OWASP detections.
+DO NOT deploy in production.
 """
 import os
 import subprocess
-import sqlite3
+import hashlib
+import pickle
+import yaml
+import random
+import requests
 
-# ──────────────────────────────────────────────────────────────────────────────
-# VULNERABILITY 1: Hardcoded AWS Access Key (SEC001 - HIGH)
-# ──────────────────────────────────────────────────────────────────────────────
-AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
-AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+# ── Hardcoded Secrets ────────────────────────────────────────────────────────
+AWS_KEY = "AKIAIOSFODNN7EXAMPLE"                              # SEC001
+openai_key = "sk-abcdefghijklmnopqrstuvwxyz012345678901234567"  # SEC015
+hf_token = "hf_abcdefghijklmnopqrstuvwxyz123456"              # SEC025
+db_url = "postgres://admin:SuperSecret123@db.prod.internal/app"  # SEC031
+gh_token = "ghp_A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7"           # SEC002
+jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc" # SEC012
 
-# ──────────────────────────────────────────────────────────────────────────────
-# VULNERABILITY 2: Hardcoded credentials in variables (SEC013 - HIGH)
-# ──────────────────────────────────────────────────────────────────────────────
-database_password = "SuperSecretPass123!"
-api_key = "prod_live_5f3a1b2c4d6e7f8a"
+# ── Weak Cryptography [CRY001] ───────────────────────────────────────────────
+def store_password(password):
+    hashed = hashlib.md5(password.encode()).hexdigest()  # VULN: CRY001
+    return hashed
 
-# ──────────────────────────────────────────────────────────────────────────────
-# VULNERABILITY 3: SQL Injection via string concatenation (SQL001 - HIGH)
-# ──────────────────────────────────────────────────────────────────────────────
-def get_user_by_name(request):
-    username = request.args.get("username")
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+def verify_password(password, stored_hash):
+    return hashlib.sha1(password.encode()).hexdigest() == stored_hash  # VULN: CRY001
 
-    # VULNERABLE: Direct string concatenation in SQL query
-    query = "SELECT * FROM users WHERE username = '" + username + "'"
-    cursor.execute(query)
-    return cursor.fetchall()
+# ── Insecure PRNG [CRY003] ───────────────────────────────────────────────────
+def generate_session_token():
+    return random.random()  # VULN: CRY003 — use secrets.token_hex()
 
+def generate_otp():
+    return random.randint(100000, 999999)  # VULN: CRY003 — predictable OTP
 
-# ──────────────────────────────────────────────────────────────────────────────
-# VULNERABILITY 4: SQL Injection via f-string (SQL001 - HIGH)
-# ──────────────────────────────────────────────────────────────────────────────
-def get_user_by_id(request):
+# ── Insecure SSL [CRY002] ────────────────────────────────────────────────────
+def fetch_data(url):
+    return requests.get(url, verify=False)  # VULN: CRY002 — MitM vulnerable
+
+# ── SSRF [SSRF001] ──────────────────────────────────────────────────────────
+def proxy_request(request):
+    target = request.args.get("url")
+    return requests.get(target)  # VULN: SSRF001 — user controls URL
+
+def fetch_profile(request):
+    user_url = request.form.get("profile_url")
+    # Attacker can use: http://169.254.169.254/latest/meta-data/
+    return requests.post(user_url, json={"data": "test"})  # VULN: SSRF001
+
+# ── Insecure Deserialization [DSER001, DSER004] ──────────────────────────────
+def load_session(cookie_data):
+    return pickle.loads(cookie_data)  # VULN: DSER001 — arbitrary code execution
+
+def load_config(config_file):
+    with open(config_file) as f:
+        return yaml.load(f)  # VULN: DSER004 — yaml.load without SafeLoader
+
+# ── Path Traversal [PATH001] ─────────────────────────────────────────────────
+def read_file(request):
+    filename = request.args.get("file")
+    with open(filename) as f:  # VULN: PATH001 — ../../etc/passwd
+        return f.read()
+
+def serve_file(request):
+    filename = request.args.get("path")
+    return send_file(filename)  # VULN: PATH002
+
+# ── SSTI / Template Injection [SSTI001] ──────────────────────────────────────
+from flask import render_template_string
+
+def render_page(request):
+    name = request.args.get("name")
+    template = f"Hello {name}!"
+    return render_template_string(template)  # VULN: SSTI001 — name={{7*7}}
+
+# ── Sensitive Data in Logs [LOG001] ─────────────────────────────────────────
+import logging
+logger = logging.getLogger(__name__)
+
+def login(request):
+    username = request.form.get("username")
+    password = request.form.get("password")     # tainted
+    logger.info("Login attempt: %s / %s", username, password)  # VULN: LOG001
+
+# ── SQL Injection [SQL001] ───────────────────────────────────────────────────
+def get_user(request, cursor):
     user_id = request.args.get("id")
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = '" + user_id + "'")  # VULN: SQL001
 
-    # VULNERABLE: f-string interpolation in SQL
-    cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
-    return cursor.fetchall()
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# VULNERABILITY 5: Command Injection via os.system (CMD001 - HIGH)
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Command Injection [CMD001] ───────────────────────────────────────────────
 def ping_host(request):
-    hostname = request.args.get("host")
+    host = request.args.get("host")
+    os.system("ping -c 1 " + host)  # VULN: CMD001
 
-    # VULNERABLE: User input directly in os.system()
-    os.system("ping -c 1 " + hostname)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# VULNERABILITY 6: Command Injection via subprocess shell=True (CMD002 - HIGH)
-# ──────────────────────────────────────────────────────────────────────────────
-def run_report(request):
-    report_name = request.form.get("report")
-
-    # VULNERABLE: shell=True with dynamic string
-    subprocess.run("generate_report.sh " + report_name, shell=True)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# VULNERABILITY 7: eval() with user input (CMD003 - HIGH)
-# ──────────────────────────────────────────────────────────────────────────────
-def calculate(request):
-    expression = request.args.get("expr")
-
-    # VULNERABLE: eval with user-controlled input
-    result = eval(expression)
-    return result
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# VULNERABILITY 8: High-entropy string that looks like a secret (SEC014)
-# ──────────────────────────────────────────────────────────────────────────────
-SIGNING_SECRET = "Xk9mP2wQzR4nV7tY1aL8cF0jH6bN3eD5"
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# SAFE CODE BELOW — Expected: Zero findings from these functions
-# ──────────────────────────────────────────────────────────────────────────────
-
-def safe_get_user(request):
-    """✅ SAFE: Parameterized query — not vulnerable to SQL injection."""
-    user_id = request.args.get("id")
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-    return cursor.fetchall()
-
-
-def safe_ping(request):
-    """✅ SAFE: subprocess list args, no shell=True."""
-    hostname = request.args.get("host")
-    result = subprocess.run(["ping", "-c", "1", hostname], capture_output=True)
-    return result.stdout
-
-
-def safe_eval():
-    """✅ SAFE: eval with a literal constant."""
-    return eval("2 + 2")
+def run_scan(request):
+    target = request.form.get("target")
+    subprocess.run(f"nmap {target}", shell=True)  # VULN: CMD002

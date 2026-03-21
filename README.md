@@ -156,48 +156,123 @@ secara scan /large/repo --workers 16
 
 ---
 
-## 🛡️ Vulnerability Coverage
+## 🛡️ Vulnerability Coverage (v0.2)
 
-### Hardcoded Secrets
+### 🔑 Hardcoded Secrets (35+ patterns)
 
 | Rule ID | Vulnerability | Severity |
 |---------|--------------|----------|
-| SEC001  | AWS Access Key (`AKIA...`) | HIGH |
-| SEC002  | GitHub Personal Access Token (`ghp_...`) | HIGH |
-| SEC005  | Stripe Live Secret Key (`sk_live_...`) | HIGH |
-| SEC007  | Slack Token (`xox...`) | HIGH |
-| SEC008  | Private Key Header (RSA/EC/OPENSSH) | HIGH |
-| SEC010  | Google API Key (`AIza...`) | HIGH |
-| SEC012  | Hardcoded JWT Token | HIGH |
-| SEC013  | Generic Hardcoded Credential Assignment | HIGH |
-| SEC014  | High-Entropy String (Possible Secret) | MEDIUM |
+| SEC001 | AWS Access Key ID (`AKIA...`) | HIGH |
+| SEC001B | AWS Secret Access Key | HIGH |
+| SEC002 | GitHub PAT (`ghp_...`) | HIGH |
+| SEC004B | GitHub Fine-Grained Token (`github_pat_...`) | HIGH |
+| SEC004C | GitLab Token (`glpat-...`) | HIGH |
+| SEC005 | Stripe Live Key (`sk_live_...`) | HIGH |
+| SEC007B | Slack Webhook URL | HIGH |
+| SEC008 | RSA/EC/OPENSSH Private Key Header | HIGH |
+| SEC009 | SendGrid API Key (`SG....`) | HIGH |
+| SEC010 | Google API Key (`AIza...`) | HIGH |
+| SEC010B | Google OAuth Secret (`GOCSPX-...`) | HIGH |
+| SEC010C | GCP Service Account Key | HIGH |
+| SEC012 | Hardcoded JWT Token | HIGH |
+| SEC015 | OpenAI API Key (`sk-...`) | HIGH |
+| SEC016 | Anthropic API Key (`sk-ant-...`) | HIGH |
+| SEC017 | Azure Storage Connection String | HIGH |
+| SEC018 | npm Auth Token (`npm_...`) | HIGH |
+| SEC020 | Telegram Bot Token | HIGH |
+| SEC021 | Discord Bot Token | HIGH |
+| SEC024 | PyPI Token (`pypi-...`) | HIGH |
+| SEC025 | HuggingFace Token (`hf_...`) | HIGH |
+| SEC026 | Databricks Token (`dapi...`) | HIGH |
+| SEC028 | HashiCorp Vault Token (`hvs....`) | HIGH |
+| SEC029 | Shopify Token (`shpat_...`) | HIGH |
+| SEC031 | Database Connection String (Postgres/MySQL/MongoDB) | HIGH |
+| SEC013 | Generic Hardcoded Credential (password/secret/api_key) | HIGH |
+| SEC014 | High-Entropy String (Possible Secret) | MEDIUM |
 
-### SQL Injection
+### 💉 SQL Injection
 
 | Rule ID | Vulnerability | Languages | Severity |
 |---------|--------------|-----------|----------|
-| SQL001  | SQLi via String Concatenation / f-string | Python AST | HIGH |
-| SQL002  | SQLi via Concatenation / Template Literal | JavaScript | HIGH |
+| SQL001 | SQLi via String Concat / f-string | Python AST | HIGH |
+| SQL002 | SQLi via Concat / Template Literal | JavaScript | HIGH |
 
-### Command Injection
+### 🖥️ Command Injection
 
 | Rule ID | Vulnerability | Languages | Severity |
 |---------|--------------|-----------|----------|
-| CMD001  | `os.system()` with dynamic args | Python | HIGH |
-| CMD002  | `subprocess` with `shell=True` + dynamic cmd | Python | HIGH |
-| CMD003  | `eval()` / `exec()` with non-literal arg | Python | HIGH/MED |
-| CMD101  | `exec()` with dynamic arg | JavaScript | HIGH |
-| CMD102  | `execSync()` with dynamic arg | JavaScript | HIGH |
-| CMD103  | `spawn()` with dynamic first arg | JavaScript | HIGH |
-| CMD104  | `eval()` with non-literal argument | JavaScript | HIGH |
-| CMD105  | Prototype Pollution | JavaScript | MEDIUM |
-| SH001   | `eval` with variable in shell script | Bash | HIGH |
-| SH002   | Unsafe backtick substitution | Bash | HIGH |
-| SH003   | Command substitution with external input | Bash | MEDIUM |
-| SH004   | Dangerous command with unquoted variable | Bash | HIGH |
-| CFG001  | Plaintext secret in config file | .env/.ini | HIGH |
-| CFG002  | Plaintext secret in JSON config | JSON | HIGH |
-| CFG003  | Plaintext secret in YAML config | YAML | HIGH |
+| CMD001 | `os.system()` with dynamic args | Python | HIGH |
+| CMD002 | `subprocess` with `shell=True` + dynamic cmd | Python | HIGH |
+| CMD003 | `eval()` / `exec()` with non-literal arg | Python | HIGH/MED |
+| CMD101 | `exec()` with dynamic arg | JavaScript | HIGH |
+| CMD102 | `execSync()` with dynamic arg | JavaScript | HIGH |
+| CMD103 | `spawn()` with dynamic first arg | JavaScript | HIGH |
+| CMD104 | `eval()` with non-literal arg | JavaScript | HIGH |
+| CMD105 | Prototype Pollution (direct `__proto__` access) | JavaScript | MEDIUM |
+| CMD107 | Prototype Pollution via `Object.assign(obj, req.body)` | JavaScript | HIGH |
+| SH001 | `eval` with variable in shell script | Bash | HIGH |
+| SH002 | Unsafe backtick substitution | Bash | HIGH |
+| SH004 | Dangerous command with unquoted variable | Bash | HIGH |
+
+### 🔐 Cryptographic Failures [OWASP A02]
+
+| Rule ID | Vulnerability | Languages | Severity |
+|---------|--------------|-----------|----------|
+| CRY001 | Weak hash: `hashlib.md5()` / `hashlib.sha1()` | Python | HIGH |
+| CRY002 | SSL cert verification disabled: `verify=False` | Python | HIGH |
+| CRY003 | Insecure PRNG: `random.random()` for secrets | Python | MEDIUM |
+| CRY004 | Weak hash: `crypto.createHash('md5'/'sha1')` | JavaScript | HIGH |
+| CRY005 | Insecure random: `Math.random()` for tokens/secrets | JavaScript | HIGH |
+
+### 🌐 Server-Side Request Forgery [OWASP A10]
+
+| Rule ID | Vulnerability | Languages | Severity |
+|---------|--------------|-----------|----------|
+| SSRF001 | `requests.get/post(user_url)` — tainted URL | Python | HIGH |
+| SSRF002 | `fetch/axios.get(user_url)` — tainted URL | JavaScript | HIGH |
+
+### 💣 Insecure Deserialization [OWASP A08]
+
+| Rule ID | Vulnerability | Languages | Severity |
+|---------|--------------|-----------|----------|
+| DSER001 | `pickle.loads(data)` — arbitrary code execution | Python | HIGH |
+| DSER002 | `marshal.loads(data)` | Python | HIGH |
+| DSER003 | `shelve.open(user_path)` — pickle-based | Python | MEDIUM |
+| DSER004 | `yaml.load()` without `SafeLoader` | Python | HIGH |
+| DSER005 | `node-serialize.deserialize(req.body)` | JavaScript | HIGH |
+| DSER006 | `yaml.load()` without safe schema | JavaScript | HIGH |
+
+### 📂 Path Traversal [OWASP A01]
+
+| Rule ID | Vulnerability | Languages | Severity |
+|---------|--------------|-----------|----------|
+| PATH001 | `open(user_input)` — directory traversal | Python | HIGH |
+| PATH002 | Flask `send_file(user_input)` | Python | HIGH |
+| PATH003 | `fs.readFile/writeFile` with dynamic path | JavaScript | HIGH |
+
+### 🎯 Injection — Extended [OWASP A03]
+
+| Rule ID | Vulnerability | Languages | Severity |
+|---------|--------------|-----------|----------|
+| SSTI001 | SSTI via `render_template_string(user_data)` | Python | HIGH |
+| XSS001 | XSS via `innerHTML = req.params.x` | JavaScript | HIGH |
+| XSS002 | Potential XSS via `element.innerHTML = var` | JavaScript | MEDIUM |
+| XSS003 | XSS via `document.write(user_data)` | JavaScript | HIGH |
+
+### 🔇 Security Logging Failures [OWASP A09]
+
+| Rule ID | Vulnerability | Languages | Severity |
+|---------|--------------|-----------|----------|
+| LOG001 | Sensitive variable (password/token) passed to logger | Python | MEDIUM |
+
+### ⚙️ Security Misconfiguration [OWASP A05]
+
+| Rule ID | Vulnerability | Languages | Severity |
+|---------|--------------|-----------|----------|
+| CFG001 | Plaintext secret value in `.env`/`.ini` file | Config | HIGH |
+| CFG002 | Plaintext secret in JSON config | JSON | HIGH |
+| CFG003 | Plaintext secret in YAML config | YAML | HIGH |
+| CFG010 | CORS wildcard `*` origin | JavaScript | MEDIUM |
 
 ---
 
