@@ -16,287 +16,13 @@ from typing import List
 
 from secara.detectors.base import BaseDetector
 from secara.output.models import Finding
+from secara.rules.rule_loader import get_rules_for_language
 
 logger = logging.getLogger("secara.secrets")
 
 # ── Known token patterns ──────────────────────────────────────────────────────
-# Each entry: (rule_id, rule_name, severity, regex_pattern)
-KNOWN_TOKEN_PATTERNS: list[tuple[str, str, str, str]] = [
-    # ── AWS ────────────────────────────────────────────────────────────────────
-    (
-        "SEC001",
-        "Hardcoded AWS Access Key ID",
-        "HIGH",
-        r"(?<![A-Z0-9])AKIA[0-9A-Z]{16}(?![A-Z0-9])",
-    ),
-    (
-        "SEC001B",
-        "Hardcoded AWS Secret Access Key",
-        "HIGH",
-        r"(?i)aws[_\-\s]?secret[_\-\s]?(?:access[_\-\s]?)?key['\":\s=]+[A-Za-z0-9/+=]{40}",
-    ),
-    # ── GitHub ─────────────────────────────────────────────────────────────────
-    (
-        "SEC002",
-        "Hardcoded GitHub Personal Access Token",
-        "HIGH",
-        r"ghp_[a-zA-Z0-9]{30,}",
-    ),
-    (
-        "SEC003",
-        "Hardcoded GitHub OAuth Token",
-        "HIGH",
-        r"gho_[a-zA-Z0-9]{30,}",
-    ),
-    (
-        "SEC004",
-        "Hardcoded GitHub Actions Token",
-        "HIGH",
-        r"ghs_[a-zA-Z0-9]{30,}",
-    ),
-    (
-        "SEC004B",
-        "Hardcoded GitHub Fine-Grained Token",
-        "HIGH",
-        r"github_pat_[a-zA-Z0-9\_]{50,}",
-    ),
-    # ── GitLab ─────────────────────────────────────────────────────────────────
-    (
-        "SEC004C",
-        "Hardcoded GitLab Personal Access Token",
-        "HIGH",
-        r"glpat-[a-zA-Z0-9\-_]{20}",
-    ),
-    # ── Stripe ─────────────────────────────────────────────────────────────────
-    (
-        "SEC005",
-        "Hardcoded Stripe Live Secret Key",
-        "HIGH",
-        r"sk_live_[0-9a-zA-Z]{15,}",
-    ),
-    (
-        "SEC006",
-        "Hardcoded Stripe Test Key",
-        "MEDIUM",
-        r"sk_test_[0-9a-zA-Z]{15,}",
-    ),
-    # ── Slack ──────────────────────────────────────────────────────────────────
-    (
-        "SEC007",
-        "Hardcoded Slack Token",
-        "HIGH",
-        r"xox[baprs]-[0-9a-zA-Z\-]{10,}",
-    ),
-    (
-        "SEC007B",
-        "Hardcoded Slack Webhook URL",
-        "HIGH",
-        r"hooks\.slack\.com/services/[A-Za-z0-9/]{30,}",
-    ),
-    # ── Private Keys ───────────────────────────────────────────────────────────
-    (
-        "SEC008",
-        "Hardcoded Private Key Header",
-        "HIGH",
-        r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
-    ),
-    # ── SendGrid ───────────────────────────────────────────────────────────────
-    (
-        "SEC009",
-        "Hardcoded SendGrid API Key",
-        "HIGH",
-        r"SG\.[a-zA-Z0-9]{22}\.[a-zA-Z0-9]{43}",
-    ),
-    # ── Google ─────────────────────────────────────────────────────────────────
-    (
-        "SEC010",
-        "Hardcoded Google API Key",
-        "HIGH",
-        r"AIza[0-9A-Za-z\-_]{30,}",
-    ),
-    (
-        "SEC010B",
-        "Hardcoded Google OAuth Client Secret",
-        "HIGH",
-        r"GOCSPX-[a-zA-Z0-9\-_]{20,}",
-    ),
-    (
-        "SEC010C",
-        "Hardcoded GCP Service Account Key (JSON)",
-        "HIGH",
-        r""""private_key_id"\s*:\s*"[a-f0-9]{30,}""",
-    ),
-    # ── Firebase ───────────────────────────────────────────────────────────────
-    (
-        "SEC010D",
-        "Hardcoded Firebase Database URL",
-        "MEDIUM",
-        r"https://[a-z0-9\-]+\.firebaseio\.com",
-    ),
-    # ── Twilio ─────────────────────────────────────────────────────────────────
-    (
-        "SEC011",
-        "Hardcoded Twilio Account SID",
-        "MEDIUM",
-        r"AC[a-z0-9]{32}",
-    ),
-    (
-        "SEC011B",
-        "Hardcoded Twilio Auth Token",
-        "HIGH",
-        r"(?i)twilio[_\-\s]?auth[_\-\s]?token['\":\s=]+[a-z0-9]{32}",
-    ),
-    # ── JWT ────────────────────────────────────────────────────────────────────
-    (
-        "SEC012",
-        "Hardcoded JWT Token",
-        "HIGH",
-        r"eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+",
-    ),
-    # ── OpenAI ─────────────────────────────────────────────────────────────────
-    (
-        "SEC015",
-        "Hardcoded OpenAI API Key",
-        "HIGH",
-        r"sk-[a-zA-Z0-9]{30,}",
-    ),
-    (
-        "SEC015B",
-        "Hardcoded OpenAI Project/Org Key",
-        "HIGH",
-        r"sk-proj-[a-zA-Z0-9\-_]{40,}",
-    ),
-    # ── Anthropic ──────────────────────────────────────────────────────────────
-    (
-        "SEC016",
-        "Hardcoded Anthropic API Key",
-        "HIGH",
-        r"sk-ant-[a-zA-Z0-9\-_]{40,}",
-    ),
-    # ── Azure ──────────────────────────────────────────────────────────────────
-    (
-        "SEC017",
-        "Hardcoded Azure Storage Account Key",
-        "HIGH",
-        r"DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]{80,}",
-    ),
-    (
-        "SEC017B",
-        "Hardcoded Azure SAS Token",
-        "HIGH",
-        r"sv=\d{4}-\d{2}-\d{2}&s[a-z]=\w+&sig=[A-Za-z0-9+/%]{30,}",
-    ),
-    # ── npm ────────────────────────────────────────────────────────────────────
-    (
-        "SEC018",
-        "Hardcoded npm Auth Token",
-        "HIGH",
-        r"npm_[a-zA-Z0-9]{30,}",
-    ),
-    # ── Cloudflare ─────────────────────────────────────────────────────────────
-    (
-        "SEC019",
-        "Hardcoded Cloudflare API Token",
-        "HIGH",
-        r"(?i)cloudflare.{0,30}['\":\s=]+[A-Za-z0-9_\-]{30,}",
-    ),
-    # ── Telegram ───────────────────────────────────────────────────────────────
-    (
-        "SEC020",
-        "Hardcoded Telegram Bot Token",
-        "HIGH",
-        r"\d{8,10}:[A-Za-z0-9_-]{35}",
-    ),
-    # ── Discord ────────────────────────────────────────────────────────────────
-    (
-        "SEC021",
-        "Hardcoded Discord Bot Token",
-        "HIGH",
-        r"[MN][a-zA-Z0-9]{23}\.[a-zA-Z0-9\-_]{6}\.[a-zA-Z0-9\-_]{27}",
-    ),
-    # ── Heroku ─────────────────────────────────────────────────────────────────
-    (
-        "SEC022",
-        "Hardcoded Heroku API Key",
-        "HIGH",
-        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-    ),
-    # ── Mailgun ────────────────────────────────────────────────────────────────
-    (
-        "SEC023",
-        "Hardcoded Mailgun API Key",
-        "HIGH",
-        r"key-[0-9a-zA-Z]{32}",
-    ),
-    # ── PyPI / Docker Hub ──────────────────────────────────────────────────────
-    (
-        "SEC024",
-        "Hardcoded PyPI Token",
-        "HIGH",
-        r"pypi-AgEIcHlwaS5vcmc[a-zA-Z0-9\-_]{100,}",
-    ),
-    # ── HuggingFace ────────────────────────────────────────────────────────────
-    (
-        "SEC025",
-        "Hardcoded HuggingFace API Token",
-        "HIGH",
-        r"hf_[a-zA-Z0-9]{25,}",
-    ),
-    # ── Databricks ─────────────────────────────────────────────────────────────
-    (
-        "SEC026",
-        "Hardcoded Databricks Token",
-        "HIGH",
-        r"dapi[a-z0-9]{32}",
-    ),
-    # ── Okta ───────────────────────────────────────────────────────────────────
-    (
-        "SEC027",
-        "Hardcoded Okta API Token",
-        "HIGH",
-        r"00[a-zA-Z0-9\-_]{40}",
-    ),
-    # ── HashiCorp Vault ────────────────────────────────────────────────────────
-    (
-        "SEC028",
-        "Hardcoded HashiCorp Vault Token",
-        "HIGH",
-        r"hvs\.[a-zA-Z0-9]{24}",
-    ),
-    # ── Shopify ────────────────────────────────────────────────────────────────
-    (
-        "SEC029",
-        "Hardcoded Shopify Access Token",
-        "HIGH",
-        r"shpat_[a-fA-F0-9]{32}",
-    ),
-    (
-        "SEC029B",
-        "Hardcoded Shopify Private App Password",
-        "HIGH",
-        r"shpss_[a-fA-F0-9]{32}",
-    ),
-    # ── PayPal / Braintree ─────────────────────────────────────────────────────
-    (
-        "SEC030",
-        "Hardcoded Braintree Access Token",
-        "HIGH",
-        r"access_token\$production\$[0-9a-z]{16}\$[0-9a-f]{32}",
-    ),
-    # ── Connection Strings ─────────────────────────────────────────────────────
-    (
-        "SEC031",
-        "Hardcoded Database Connection String",
-        "HIGH",
-        r"(?:postgres|mysql|mongodb|mssql|redis|amqp)(?:\+\w+)?://[^:'\"\s]+:[^@'\"\s]+@",
-    ),
-    (
-        "SEC031B",
-        "Hardcoded SSH Private Key (inline)",
-        "HIGH",
-        r"-----BEGIN OPENSSH PRIVATE KEY-----",
-    ),
-]
+# Rules are now loaded dynamically from secara/rules/builtin/secrets.yaml
+
 
 # ── Generic keyword-proximity patterns ────────────────────────────────────────
 # Match: key_word = "value" or key_word=value
@@ -369,26 +95,22 @@ class SecretsDetector(BaseDetector):
         self, file_path: Path, line: str, line_no: int
     ) -> List[Finding]:
         results = []
-        for rule_id, rule_name, severity, pattern in KNOWN_TOKEN_PATTERNS:
+        rules = [r for r in get_rules_for_language("any") if r.pattern_type == "regex"]
+        for rule in rules:
+            pattern = rule.pattern.get("regex", "")
+            if not pattern:
+                continue
             if re.search(pattern, line):
                 results.append(
                     Finding(
-                        rule_id=rule_id,
-                        rule_name=rule_name,
-                        severity=severity,
+                        rule_id=rule.id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
                         file_path=str(file_path),
                         line_number=line_no,
                         snippet=line.strip(),
-                        description=(
-                            f"A {rule_name} was found hardcoded in the source. "
-                            "Committing secrets to source control exposes them to anyone "
-                            "with repository access and leaks them in version history."
-                        ),
-                        fix=(
-                            "Remove the secret from the code. Store it in an environment "
-                            "variable (e.g. os.environ['KEY']) or a secrets manager "
-                            "(e.g. AWS Secrets Manager, Vault, .env file excluded via .gitignore)."
-                        ),
+                        description=f"{rule.description}\nCommitting secrets to source control exposes them to anyone with repository access.",
+                        fix=rule.fix,
                         language=file_path.suffix.lstrip("."),
                     )
                 )

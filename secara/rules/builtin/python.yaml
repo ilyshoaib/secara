@@ -1,0 +1,149 @@
+rules:
+  # ── SQL Injection ────────────────────────────────────────────────────────
+  - id: SQL001
+    name: "SQL Injection via String Formatting"
+    severity: HIGH
+    description: "Detected execution of a dynamic SQL query constructed via string formatting or concatenation."
+    fix: "Use parameterized queries (e.g., cursor.execute('SELECT * FROM users WHERE user=?', (username,))) instead of string formatting."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "sql"
+      functions: ["execute", "executemany", "executescript", "raw", "query"]
+
+  # ── Command Injection (OS) ────────────────────────────────────────────────
+  - id: CMD001
+    name: "Command Injection via os.system/popen"
+    severity: HIGH
+    description: "Detected dynamic string passed to os.system or os.popen."
+    fix: "Avoid calling external processes with user input. If necessary, use subprocess.run with shell=False and pass arguments as a list."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "os_cmd"
+      modules: ["os"]
+      functions: ["system", "popen", "getoutput", "getstatusoutput"]
+
+  # ── Command Injection (Subprocess) ────────────────────────────────────────
+  - id: CMD002
+    name: "Command Injection via subprocess with shell=True"
+    severity: HIGH
+    description: "Detected dynamic command passed to subprocess with shell=True."
+    fix: "Use subprocess.run with shell=False and pass arguments as a list (e.g., ['ls', '-l', user_dir])."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "subprocess"
+      modules: ["subprocess"]
+      functions: ["call", "run", "Popen", "check_output", "check_call", "getoutput"]
+
+  # ── Command Injection (eval/exec) ─────────────────────────────────────────
+  - id: CMD003
+    name: "Arbitrary Code Execution via eval/exec"
+    severity: HIGH
+    description: "Detected eval() or exec() used with non-literal source."
+    fix: "Do not use eval() on untrusted data. Use ast.literal_eval() for safe parsing of data structures."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "eval"
+      functions: ["eval", "exec", "compile"]
+
+  # ── SSRF ─────────────────────────────────────────────────────────────────
+  - id: SSRF001
+    name: "Server-Side Request Forgery (SSRF)"
+    severity: HIGH
+    description: "Detected outgoing HTTP request with a tainted, dynamic URL."
+    fix: "Validate the URL against an allowlist of permitted IP addresses/hostnames before making the request."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "ssrf"
+      modules: ["requests", "httpx", "urllib"]
+      functions: ["get", "post", "put", "patch", "delete", "head", "request", "urlopen", "urlretrieve"]
+
+  # ── Deserialization (Pickle/Marshal) ───────────────────────────────────────
+  - id: DSER001
+    name: "Insecure Deserialization via pickle.loads"
+    severity: HIGH
+    description: "Detected use of pickle.loads/load on untrusted data."
+    fix: "Use a safe serialization format like JSON instead of pickle, or cryptographically sign the serialized data."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "deserialization"
+      modules: ["pickle", "marshal", "shelve"]
+      functions: ["loads", "load", "open"]
+
+  # ── Deserialization (YAML) ────────────────────────────────────────────────
+  - id: DSER004
+    name: "Insecure YAML Deserialization"
+    severity: HIGH
+    description: "Detected yaml.load() used without a SafeLoader."
+    fix: "Use yaml.safe_load(data) instead of yaml.load(data)."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "yaml"
+      modules: ["yaml"]
+      functions: ["load", "load_all"]
+
+  # ── Weak Crypto ──────────────────────────────────────────────────────────
+  - id: CRY001
+    name: "Weak Cryptographic Hash algorithm"
+    severity: HIGH
+    description: "Detected the use of an obsolete and weak hash algorithm (MD5/SHA1)."
+    fix: "Use strong hashing algorithms like SHA-256 for data integrity, or Argon2/Bcrypt for password hashing."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "weak_hash"
+      modules: ["hashlib"]
+      functions: ["md5", "sha1"]
+
+  # ── Crypto: SSL verify=False ─────────────────────────────────────────────
+  - id: CRY002
+    name: "SSL Certificate Verification Disabled"
+    severity: HIGH
+    description: "Detected an HTTP request with SSL verification explicitly set to False."
+    fix: "Do not disable SSL verification in production environments (remove verify=False)."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "ssl_verify"
+
+  # ── Weak PRNG ────────────────────────────────────────────────────────────
+  - id: CRY003
+    name: "Insecure PRNG for Cryptographic Use"
+    severity: MEDIUM
+    description: "Detected random module functions which are not cryptographically secure."
+    fix: "Use the secrets module (e.g., secrets.token_hex(32)) for generating security tokens."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "weak_prng"
+      modules: ["random"]
+      functions: ["random", "randint", "choice", "choices", "sample", "randrange"]
+
+  # ── Path Traversal ───────────────────────────────────────────────────────
+  - id: PATH001
+    name: "Path Traversal via open()"
+    severity: HIGH
+    description: "Detected open() called with a tainted path variable."
+    fix: "Sanitize the path by calling os.path.basename() or validating it against an allowed directory."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "path_open"
+      functions: ["open"]
+
+  - id: PATH002
+    name: "Path Traversal via send_file()"
+    severity: HIGH
+    description: "Detected Flask send_file() called with a tainted path variable."
+    fix: "Avoid letting users define full file paths; map user input to internal IDs or use safe directory restrictions."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "path_send"
+      functions: ["send_file", "send_from_directory"]
