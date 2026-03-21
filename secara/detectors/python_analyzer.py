@@ -148,6 +148,9 @@ class PythonAnalyzer(BaseDetector):
         def _get_funcs(rule_id):
             return set(self.yaml_rules[rule_id].pattern.get("functions", [])) if rule_id in self.yaml_rules else set()
             
+        def _get_methods(rule_id):
+            return set(self.yaml_rules[rule_id].pattern.get("methods", [])) if rule_id in self.yaml_rules else set()
+
         self.sql_execute_attrs = _get_funcs("SQL001")
         self.os_dangerous = _get_funcs("CMD001")
         self.subprocess_dangerous = _get_funcs("CMD002")
@@ -159,6 +162,9 @@ class PythonAnalyzer(BaseDetector):
         self.weak_prng = _get_funcs("CRY003")
         self.path_open = _get_funcs("PATH001")
         self.path_send = _get_funcs("PATH002")
+        self.toctou_checks = set(self.yaml_rules["RACE001"].pattern.get("check_functions", [])) if "RACE001" in self.yaml_rules else set()
+        self.mass_methods = _get_methods("MASS001")
+        self.temp_funcs = _get_funcs("TEMP001")
 
     def analyze(self, file_path: Path, content: str) -> List[Finding]:
         findings: List[Finding] = []
@@ -213,14 +219,22 @@ class PythonAnalyzer(BaseDetector):
         lines: list[str],
         findings: List[Finding],
     ) -> None:
+        checked_paths = {} # path_str -> check_node
+        
         for node in nodes:
             if isinstance(node, ast.If):
-                finding = self._check_toctou(file_path, node, tracker, lines)
+                # Handle TOCTOU check-then-return or check-then-open
+                finding = self._check_toctou(file_path, node, tracker, lines, checked_paths)
                 if finding:
                     findings.append(finding)
 
             if not isinstance(node, ast.Call):
                 continue
+
+            # Check for TOCTOU open() after a check in the same scope
+            finding = self._check_toctou_sequential(file_path, node, checked_paths, lines)
+            if finding:
+                findings.append(finding)
 
             # ── SQL Injection ──────────────────────────────────────────────
             finding = self._check_sql_injection(file_path, node, tracker, lines)
@@ -1016,31 +1030,23 @@ class PythonAnalyzer(BaseDetector):
         line_no = call.lineno
 
         # yaml.load(stream) without Loader keyword — defaults to full Loader (dangerous)
-        if len(chain) == 2 and chain[0] == "yaml" and chain[1] == "load":
+        if len(chain) == 2 and chain[0] == "yaml" and chain[1] in self.yaml_loads:
             # Check if Loader kwarg is present and safe
             loader_kw = next(
                 (kw for kw in call.keywords if kw.arg == "Loader"), None
             )
             if loader_kw is None:
-                # No Loader specified — dangerous (uses FullLoader which can exec code)
+                if "DSER004" not in self.yaml_rules: return None
+                rule = self.yaml_rules["DSER004"]
                 return Finding(
-                    rule_id="DSER004",
-                    rule_name="Insecure yaml.load() Without SafeLoader",
-                    severity="HIGH",
+                    rule_id=rule.id,
+                    rule_name=rule.name,
+                    severity=rule.severity,
                     file_path=str(file_path),
                     line_number=line_no,
                     snippet=self.get_snippet(lines, line_no),
-                    description=(
-                        "yaml.load() without an explicit Loader uses the FullLoader by default "
-                        "(or UnsafeLoader in older PyYAML), which can deserialize arbitrary "
-                        "Python objects and execute code. Malicious YAML like "
-                        "!!python/object/apply:os.system ['id'] will execute OS commands."
-                    ),
-                    fix=(
-                        "Always specify a safe Loader:\n"
-                        "  yaml.safe_load(stream)           # simplest, recommended\n"
-                        "  yaml.load(stream, Loader=yaml.SafeLoader)"
-                    ),
+                    description=rule.description,
+                    fix=rule.fix,
                     language="python",
                 )
 
@@ -1058,27 +1064,21 @@ class PythonAnalyzer(BaseDetector):
         line_no = call.lineno
 
         # Check for obj.__dict__.update(user_data)
-        if len(chain) >= 2 and chain[-2] == "__dict__" and chain[-1] == "update":
+        if len(chain) >= 2 and chain[-2] == "__dict__" and chain[-1] in self.mass_methods:
             if call.args:
                 arg0 = call.args[0]
                 if tracker.is_arg_tainted(call) or self._arg_contains_tainted_name(arg0, tracker.tainted_names):
+                    if "MASS001" not in self.yaml_rules: return None
+                    rule = self.yaml_rules["MASS001"]
                     return Finding(
-                        rule_id="MASS001",
-                        rule_name="Mass Assignment via __dict__.update()",
-                        severity="HIGH",
+                        rule_id=rule.id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
                         file_path=str(file_path),
                         line_number=line_no,
                         snippet=self.get_snippet(lines, line_no),
-                        description=(
-                            "An object's internal __dict__ is being updated with user-controlled data. "
-                            "This allows an attacker to overwrite sensitive internal attributes "
-                            "(e.g., is_admin=True) leading to privilege escalation."
-                        ),
-                        fix=(
-                            "Use explicit attribute assignment or an allowed list of fields:\n"
-                            "  obj.name = data.get('name')\n"
-                            "  obj.email = data.get('email')"
-                        ),
+                        description=rule.description,
+                        fix=rule.fix,
                         language="python",
                     )
 
@@ -1115,6 +1115,7 @@ class PythonAnalyzer(BaseDetector):
         if_node: ast.If,
         tracker: PythonTaintTracker,
         lines: list[str],
+        checked_paths: dict[str, ast.Call],
     ) -> Finding | None:
         # Check if the condition is `os.path.exists(path)` or `os.path.isfile(path)`
         test_call = None
@@ -1126,7 +1127,7 @@ class PythonAnalyzer(BaseDetector):
 
         if test_call:
             chain = _attr_chain(test_call.func)
-            if len(chain) == 3 and chain[0] == "os" and chain[1] == "path" and chain[2] in ("exists", "isfile", "isdir"):
+            if len(chain) == 3 and chain[0] == "os" and chain[1] == "path" and chain[2] in self.toctou_checks:
                 # Check if the body contains an `open()` call
                 for child in ast.walk(if_node):
                     if child is if_node.test:
@@ -1134,24 +1135,18 @@ class PythonAnalyzer(BaseDetector):
                     if isinstance(child, ast.Call):
                         child_chain = _attr_chain(child.func)
                         if len(child_chain) == 1 and child_chain[0] == "open":
+                            if "RACE001" not in self.yaml_rules: return None
+                            rule = self.yaml_rules["RACE001"]
                             line_no = test_call.lineno
                             return Finding(
-                                rule_id="RACE001",
-                                rule_name="Time-of-Check Time-of-Use (TOCTOU) Race Condition",
-                                severity="MEDIUM",
+                                rule_id=rule.id,
+                                rule_name=rule.name,
+                                severity=rule.severity,
                                 file_path=str(file_path),
                                 line_number=line_no,
                                 snippet=self.get_snippet(lines, line_no),
-                                description=(
-                                    f"Checking file status with os.path.{chain[2]}() before opening it "
-                                    "creates a classic TOCTOU race condition. An attacker can replace "
-                                    "the file with a symlink between the check and the open() call, "
-                                    "leading to arbitrary file read/write."
-                                ),
-                                fix=(
-                                    "Use try-except to open the file directly and handle the "
-                                    "FileNotFoundError or FileExistsError. Do not check beforehand."
-                                ),
+                                description=rule.description,
+                                fix=rule.fix,
                                 language="python",
                             )
         return None
@@ -1167,23 +1162,18 @@ class PythonAnalyzer(BaseDetector):
         chain = _attr_chain(call.func)
         line_no = call.lineno
 
-        if len(chain) == 2 and chain[0] == "tempfile" and chain[1] == "mktemp":
+        if len(chain) == 2 and chain[0] == "tempfile" and chain[1] in self.temp_funcs:
+            if "TEMP001" not in self.yaml_rules: return None
+            rule = self.yaml_rules["TEMP001"]
             return Finding(
-                rule_id="TEMP001",
-                rule_name="Insecure Temporary File (tempfile.mktemp)",
-                severity="HIGH",
+                rule_id=rule.id,
+                rule_name=rule.name,
+                severity=rule.severity,
                 file_path=str(file_path),
                 line_number=line_no,
                 snippet=self.get_snippet(lines, line_no),
-                description=(
-                    "tempfile.mktemp() is deeply insecure and deprecated. It only generates "
-                    "a filename but does not securely create the file, leading to predictable "
-                    "temporary files and race conditions."
-                ),
-                fix=(
-                    "Use tempfile.NamedTemporaryFile() or tempfile.mkstemp() instead, "
-                    "which securely create the file with restricted permissions."
-                ),
+                description=rule.description,
+                fix=rule.fix,
                 language="python",
             )
         return None
