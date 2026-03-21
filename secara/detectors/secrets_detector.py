@@ -352,10 +352,11 @@ class SecretsDetector(BaseDetector):
         lines = content.splitlines()
 
         for line_no, line in enumerate(lines, start=1):
-            # Skip comment-only lines
+            # Skip comment-only lines (but allow private key headers)
             stripped = line.strip()
             if stripped.startswith(("#", "//", "/*", "*", "--")):
-                continue
+                if not stripped.startswith("-----BEGIN"):
+                    continue
 
             findings.extend(self._check_known_tokens(file_path, line, line_no))
             findings.extend(self._check_keyword_proximity(file_path, line, line_no))
