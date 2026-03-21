@@ -1188,6 +1188,33 @@ class PythonAnalyzer(BaseDetector):
                 )
         return None
 
+    def _check_toctou_sequential(
+        self,
+        file_path: Path,
+        call: ast.Call,
+        checked_paths: dict[str, ast.Call],
+        lines: list[str],
+    ) -> Finding | None:
+        chain = _attr_chain(call.func)
+        if len(chain) == 1 and chain[0] == "open" and call.args:
+            arg_str = ast.dump(call.args[0])
+            if arg_str in checked_paths:
+                test_call = checked_paths[arg_str]
+                if "RACE001" not in self.yaml_rules: return None
+                rule = self.yaml_rules["RACE001"]
+                return Finding(
+                    rule_id=rule.id,
+                    rule_name=rule.name,
+                    severity=rule.severity,
+                    file_path=str(file_path),
+                    line_number=call.lineno,
+                    snippet=self.get_snippet(lines, call.lineno),
+                    description=f"Sequential TOCTOU: Path was checked at line {test_call.lineno} and then opened.\n{rule.description}",
+                    fix=rule.fix,
+                    language="python",
+                )
+        return None
+
 
     # ── Insecure Temporary Files [A01] ───────────────────────────────────────
     def _check_temp_files(
