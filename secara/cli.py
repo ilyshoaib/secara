@@ -146,6 +146,16 @@ def cli() -> None:
     help="Show full descriptions and fix details.",
 )
 @click.option(
+    "--sarif",
+    is_flag=True, default=False,
+    help="Output results in SARIF format for CI/CD.",
+)
+@click.option(
+    "--output", "-o",
+    type=click.Path(path_type=Path), default=None,
+    help="Write output to file (useful with --sarif or --json).",
+)
+@click.option(
     "--severity", "-s",
     type=click.Choice(["HIGH", "MEDIUM", "LOW"], case_sensitive=False),
     default="LOW",
@@ -166,6 +176,8 @@ def scan_command(
     path: Path,
     use_json: bool,
     verbose: bool,
+    sarif: bool,
+    output: Path | None,
     severity: str,
     no_cache: bool,
     workers: int,
@@ -183,7 +195,7 @@ def scan_command(
     _configure_logging(verbose)
 
     # ── Banner (non-JSON mode) ────────────────────────────────────────────
-    if not use_json:
+    if not use_json and not sarif:
         try:
             from rich.console import Console
             from rich.padding import Padding
@@ -197,7 +209,7 @@ def scan_command(
 
     # ── Collect files ─────────────────────────────────────────────────────
     files = collect_files(path)
-    if not use_json and files:
+    if not use_json and not sarif and files:
         try:
             from rich.console import Console
             Console().print(
@@ -207,7 +219,7 @@ def scan_command(
         except ImportError:
             print(f"Scanning {len(files)} files…\n")
     elif not files:
-        if not use_json:
+        if not use_json and not sarif:
             print("No scannable files found.")
         sys.exit(0)
 
@@ -226,9 +238,15 @@ def scan_command(
     filtered = filter_findings(all_findings, severity)
 
     # ── Render ────────────────────────────────────────────────────────────
-    render_findings(filtered, use_json=use_json, verbose=verbose)
+    render_findings(
+        filtered,
+        use_json=use_json,
+        use_sarif=sarif,
+        output_file=str(output) if output else None,
+        verbose=verbose,
+    )
 
-    if not use_json:
+    if not use_json and not sarif:
         try:
             from rich.console import Console
             Console().print(
