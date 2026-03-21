@@ -46,54 +46,47 @@ else
     echo -e "${GREEN}✓ secara installed (user mode)${RESET}"
 fi
 
-# ── 3. Detect and fix PATH ────────────────────────────────────────────────────
-LOCAL_BIN="$HOME/.local/bin"
-NEEDS_PATH=false
+# ── 3. Find the installed binary and link it ────────────────────────────────────
+echo ""
+echo -e "${BOLD}Configuring command line access...${RESET}"
 
-if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
-    NEEDS_PATH=true
+# Find where pip installed the binary
+SECARA_BIN=""
+if command -v secara &>/dev/null; then
+    SECARA_BIN=$(command -v secara)
+elif [ -f "$HOME/.local/bin/secara" ]; then
+    SECARA_BIN="$HOME/.local/bin/secara"
+elif [ -f "/usr/local/bin/secara" ]; then
+    SECARA_BIN="/usr/local/bin/secara"
 fi
 
-if $NEEDS_PATH; then
-    echo ""
-    echo -e "${YELLOW}⚠  ~/.local/bin is not in your PATH (this is why 'secara' command isn't found).${RESET}"
+if [ -z "$SECARA_BIN" ]; then
+    echo -e "${RED}✗ Could not locate the installed 'secara' binary.${RESET}"
+    echo "  Try running: python3 -m secara.cli"
+    exit 1
+fi
 
-    # Detect shell and rc file
-    SHELL_NAME=$(basename "$SHELL")
-    case "$SHELL_NAME" in
-        bash) RC_FILE="$HOME/.bashrc" ;;
-        zsh)  RC_FILE="$HOME/.zshrc"  ;;
-        fish) RC_FILE="$HOME/.config/fish/config.fish" ;;
-        *)    RC_FILE="$HOME/.profile" ;;
-    esac
-
-    EXPORT_LINE='export PATH="$HOME/.local/bin:$PATH"'
-
-    # Avoid duplicate entries
-    if ! grep -qF "$LOCAL_BIN" "$RC_FILE" 2>/dev/null; then
-        echo "" >> "$RC_FILE"
-        echo "# Added by Secara installer" >> "$RC_FILE"
-        echo "$EXPORT_LINE" >> "$RC_FILE"
-        echo -e "${GREEN}✓ Added ~/.local/bin to PATH in ${RC_FILE}${RESET}"
+# Check if it's already in the system PATH
+if command -v secara &>/dev/null && [ "$(command -v secara)" = "/usr/local/bin/secara" ]; then
+    echo -e "${GREEN}✓ 'secara' is already globally available.${RESET}"
+else
+    echo -e "${YELLOW}  To make the 'secara' command available everywhere without restarting"
+    echo -e "  your terminal, we will create a symlink in /usr/local/bin.${RESET}"
+    echo -e "  ${CYAN}(This requires sudo privileges)${RESET}"
+    
+    if sudo ln -sf "$SECARA_BIN" /usr/local/bin/secara; then
+        echo -e "${GREEN}✓ Successfully created symlink in /usr/local/bin/secara${RESET}"
     else
-        echo -e "${GREEN}✓ ~/.local/bin already in ${RC_FILE}${RESET}"
+        echo -e "${RED}✗ Failed to create symlink. You may need to add ${SECARA_BIN%/*} to your PATH manually.${RESET}"
     fi
-
-    # Apply immediately for this session
-    export PATH="$LOCAL_BIN:$PATH"
 fi
 
 # ── 4. Verify secara command ──────────────────────────────────────────────────
 echo ""
 if command -v secara &>/dev/null; then
-    SECARA_PATH=$(command -v secara)
-    echo -e "${GREEN}✓ secara command is ready: ${SECARA_PATH}${RESET}"
+    echo -e "${GREEN}✓ secara command is ready: $(command -v secara)${RESET}"
 else
-    # Last resort: try python -m secara
-    echo -e "${YELLOW}  'secara' binary not found in PATH, checking fallback...${RESET}"
-    if python3 -m secara.cli --version &>/dev/null 2>&1; then
-        echo -e "${GREEN}✓ secara works via: python3 -m secara.cli${RESET}"
-    fi
+    echo -e "${YELLOW}  'secara' binary not found in PATH. You can run it via: python3 -m secara.cli${RESET}"
 fi
 
 # ── 5. Done ───────────────────────────────────────────────────────────────────
@@ -101,10 +94,7 @@ echo ""
 echo -e "${BOLD}────────────────────────────────${RESET}"
 echo -e "${GREEN}${BOLD}✅ Installation complete!${RESET}"
 echo ""
-echo -e "  ${BOLD}Reload your shell or run:${RESET}"
-echo -e "    ${CYAN}source ${RC_FILE:-~/.bashrc}${RESET}"
-echo ""
-echo -e "  ${BOLD}Then scan a directory:${RESET}"
+echo -e "  ${BOLD}You can now scan a directory from anywhere:${RESET}"
 echo -e "    ${CYAN}secara scan .${RESET}"
 echo -e "    ${CYAN}secara scan ./src --severity HIGH${RESET}"
 echo -e "    ${CYAN}secara scan . --verbose${RESET}"

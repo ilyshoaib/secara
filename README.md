@@ -53,13 +53,12 @@ bash install.sh
 
 The installer will:
 - Install secara from source
-- **Automatically add `~/.local/bin` to your PATH** (in `.bashrc`, `.zshrc`, or `.profile`)
+- **Create a global symlink in `/usr/local/bin`** (may prompt for `sudo` password)
 - Verify the `secara` command works
 
-Then reload your shell and you're done:
+You can now use `secara` from anywhere immediately:
 
 ```bash
-source ~/.bashrc   # or source ~/.zshrc if using zsh
 secara scan .
 ```
 
