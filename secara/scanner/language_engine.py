@@ -32,6 +32,7 @@ EXTENSION_MAP: dict[str, tuple[str, str]] = {
     ".json": (LanguageTier.TIER2, "json"),
     ".yaml": (LanguageTier.TIER2, "yaml"),
     ".yml":  (LanguageTier.TIER2, "yaml"),
+    ".go":   (LanguageTier.TIER2, "go"),
 
     # Config / Secrets-only
     ".env":  (LanguageTier.SECRETS_ONLY, "env"),
