@@ -198,6 +198,11 @@ class PythonAnalyzer(BaseDetector):
         findings: List[Finding],
     ) -> None:
         for node in nodes:
+            if isinstance(node, ast.If):
+                finding = self._check_toctou(file_path, node, tracker, lines)
+                if finding:
+                    findings.append(finding)
+
             if not isinstance(node, ast.Call):
                 continue
 
@@ -258,6 +263,16 @@ class PythonAnalyzer(BaseDetector):
 
             # ── Weak random for security [A02] ─────────────────────────────
             finding = self._check_weak_random(file_path, node, tracker, lines)
+            if finding:
+                findings.append(finding)
+
+            # ── Mass Assignment [A04] ──────────────────────────────────────
+            finding = self._check_mass_assignment(file_path, node, tracker, lines)
+            if finding:
+                findings.append(finding)
+
+            # ── Insecure Temporary Files [A01] ─────────────────────────────
+            finding = self._check_temp_files(file_path, node, tracker, lines)
             if finding:
                 findings.append(finding)
 
