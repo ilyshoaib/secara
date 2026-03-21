@@ -147,3 +147,41 @@ rules:
     pattern:
       category: "path_send"
       functions: ["send_file", "send_from_directory"]
+
+  # ── TOCTOU Race Conditions ───────────────────────────────────────────────
+  - id: RACE001
+    name: "TOCTOU Race Condition (Check-then-Open)"
+    severity: MEDIUM
+    description: "Detected a file check (os.path.exists/isfile) followed by an open() on the same path. This is a Time-of-Check to Time-of-Use race condition."
+    fix: "Open the file directly and handle the OSError (FileNotFoundError/PermissionError) to ensure atomicity."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "toctou"
+      check_functions: ["exists", "isfile", "isdir", "access"]
+      open_functions: ["open"]
+
+  # ── Mass Assignment ──────────────────────────────────────────────────────
+  - id: MASS001
+    name: "Potential Mass Assignment (Model Injection)"
+    severity: MEDIUM
+    description: "Detected dynamic keyword arguments (**kwargs) passed to a model constructor or update method, which may allow attackers to modify protected fields."
+    fix: "Explicitly list allowed fields or use a schema/DTO to validate input before updating the model."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "mass_assignment"
+      methods: ["update", "create", "save"]
+
+  # ── Insecure Temp Files ──────────────────────────────────────────────────
+  - id: TEMP001
+    name: "Insecure Temporary File Creation"
+    severity: MEDIUM
+    description: "Detected use of insecure tempfile functions (mktemp) which are vulnerable to race conditions."
+    fix: "Use tempfile.TemporaryFile() or tempfile.NamedTemporaryFile() which create files securely."
+    languages: ["python"]
+    pattern_type: "ast_sink"
+    pattern:
+      category: "temp_file"
+      functions: ["mktemp"]
+
