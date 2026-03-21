@@ -1,0 +1,42 @@
+name: "Secara Security Scan"
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  schedule:
+    - cron: '0 0 * * 0' # Weekly scan
+
+jobs:
+  secara-scan:
+    name: Run Secara Code Scanner
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install secara
+        run: |
+          pip install git+https://github.com/ilyshoaib/secara.git@main
+
+      - name: Run secara scan and generate SARIF
+        run: |
+          # We don't fail the build here, we let GitHub Code Scanning handle the failure thresholds
+          secara scan . --sarif --output secara-results.sarif || true
+
+      - name: Upload SARIF file to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: secara-results.sarif
+          category: secara

@@ -379,7 +379,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 - [x] Go language support (Tier 2/Regex)
 - [ ] Ruby / PHP support (Tier 2)
 - [x] SARIF output format (GitHub Code Scanning compatible)
-- [ ] GitHub Actions workflow
+- [x] GitHub Actions workflow
 - [ ] VS Code extension
 - [ ] Interprocedural taint analysis
 - [ ] Custom rule authoring (YAML)
