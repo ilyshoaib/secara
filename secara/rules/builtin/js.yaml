@@ -1,0 +1,139 @@
+rules:
+  # ── SQL Injection ────────────────────────────────────────────────────────
+  - id: SQL101
+    name: "SQL Injection via String Concatenation (JS/TS)"
+    severity: HIGH
+    description: "Detected execution of a dynamic SQL query constructed via string concatenation or template literals."
+    fix: "Use parameterized queries or prepared statements (e.g., db.query('SELECT * FROM users WHERE id = ?', [userId]))."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:\\.query|\\.execute|\\.raw|db\\.run|pool\\.query)\\s*\\(\\s*(?:[`'\"].*?\\+\\s*\\w+|\\w+\\s*\\+\\s*[`'\"]|`[^`]*?\\$\\{[^}]+\\})"
+
+  # ── Command Injection ────────────────────────────────────────────────────
+  - id: CMD101
+    name: "Command Injection via exec()"
+    severity: HIGH
+    description: "Detected dynamic entry passed to child_process.exec(). This allow arbitrary command execution."
+    fix: "Use execFile or spawn with argument arrays instead of shell-interpolated strings."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)exec\\s*\\(\\s*(?:[`\"'].*?\\+\\s*\\w+|\\w+\\s*\\+\\s*[`\"']|`[^`]*\\$\\{[^}]+\\}|\\w+)\\s*[,)]"
+
+  - id: CMD102
+    name: "Command Injection via execSync()"
+    severity: HIGH
+    description: "Detected dynamic entry passed to child_process.execSync()."
+    fix: "Avoid shell interpolation; pass sanitized arguments as a list."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)execSync\\s*\\(\\s*(?:[`\"'].*?\\+\\s*\\w+|\\w+\\s*\\+\\s*[`\"']|`[^`]*\\$\\{[^}]+\\}|\\w+)\\s*[,)]"
+
+  - id: CMD103
+    name: "Command Injection via spawn()"
+    severity: HIGH
+    description: "Detected dynamic command passed to child_process.spawn()."
+    fix: "Ensure the command itself is not user-controlled. Pass arguments in the second parameter array."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)spawn\\s*\\(\\s*(?:[`\"'].*?\\+\\s*\\w+|\\w+\\s*\\+\\s*[`\"']|`[^`]*\\$\\{[^}]+\\}|\\w+)\\s*,"
+
+  # ── Prototype Pollution ──────────────────────────────────────────────────
+  - id: PRO101
+    name: "Potential Prototype Pollution"
+    severity: HIGH
+    description: "Detected assignment to __proto__, constructor, or prototype which can lead to prototype pollution."
+    fix: "Use Object.create(null) for objects that store user data, or use a library with pollution protection."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:__proto__|constructor\\s*\\[|prototype\\s*\\[)\\s*\\[?\\s*['\"]\\w+"
+
+  # ── XSS (Cross-Site Scripting) ───────────────────────────────────────────
+  - id: XSS101
+    name: "DOM-based XSS via innerHTML"
+    severity: HIGH
+    description: "Detected assignment of potentially tainted data to .innerHTML, which can execute malicious scripts."
+    fix: "Use .textContent or .innerText instead of .innerHTML, or use a DOM sanitizer library."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)\\.innerHTML\\s*(?:\\+=|=)\\s*(?:[^;]*(?:req\\.|request\\.|params\\.|query\\.|body\\.|location\\.|document\\.URL|\\$_GET|\\$_POST|getParam|userInput|\\w+Input))"
+
+  - id: XSS102
+    name: "DOM-based XSS via document.write"
+    severity: HIGH
+    description: "Detected use of document.write with dynamic data."
+    fix: "Avoid document.write; use DOM manipulation methods like document.createElement."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)document\\.write(?:ln)?\\s*\\(\\s*(?:[^)]*(?:req\\.|params\\.|query\\.|location\\.|\\w+Input|\\w+Param))"
+
+  # ── SSRF ─────────────────────────────────────────────────────────────────
+  - id: SSRF101
+    name: "Server-Side Request Forgery / SSRF (JS)"
+    severity: HIGH
+    description: "Detected HTTP request with a dynamically constructed URL."
+    fix: "Validate URLs against an allowlist and prevent requests to private networking ranges."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:fetch|axios\\.get|axios\\.post|axios\\.request|http\\.get|http\\.request|https\\.get|https\\.request)\\s*\\(\\s*(?:\\w+\\s*\\+\\s*[`'\"]|['\"]\\s*\\+\\s*\\w+|`[^`]*\\$\\{[^}]+\\}|\\w+)\\s*[,)]"
+
+  # ── Deserialization ──────────────────────────────────────────────────────
+  - id: DSER101
+    name: "Insecure Deserialization via node-serialize"
+    severity: HIGH
+    description: "Detected use of node-serialize or serialize-to-js which can execute embedded function expressions during deserialization."
+    fix: "Use JSON.parse() and validate the schema with a library like Zod or Joi."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:serialize-to-js|node-serialize)\\.unserialize\\s*\\("
+
+  - id: DSER104
+    name: "Insecure YAML Deserialization (js-yaml)"
+    severity: HIGH
+    description: "Detected yaml.load() call without SAFE_SCHEMA, which may allow execution of !!js/function tags."
+    fix: "Use SAFE_SCHEMA: yaml.load(data, { schema: yaml.SAFE_SCHEMA })"
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)yaml\\.load\\s*\\([^,)]+\\)(?!\\s*,\\s*\\{.*?schema.*?\\})"
+
+  # ── Weak Crypto ──────────────────────────────────────────────────────────
+  - id: CRY101
+    name: "Weak Hash Algorithm"
+    severity: HIGH
+    description: "Detected use of MD5 or SHA1 hash algorithms which are cryptographically broken."
+    fix: "Use SHA-256 or better for integrity; use Bcrypt/Argon2 for passwords."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)\\.createHash\\s*\\(\\s*['\"](?:md5|sha1)['\"]"
+
+  - id: CRY102
+    name: "Insecure Math.random() for Security"
+    severity: MEDIUM
+    description: "Math.random() is not cryptographically secure and should not be used for tokens or session IDs."
+    fix: "Use crypto.randomBytes() or crypto.getRandomValues()."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)Math\\.random\\s*\\(\\s*\\)"
+
+  # ── Path Traversal ───────────────────────────────────────────────────────
+  - id: PATH101
+    name: "Path Traversal via fs module"
+    severity: HIGH
+    description: "Detected file system operation with dynamically constructed path."
+    fix: "Sanitize paths using path.basename() or validate them against an allowlist."
+    languages: ["javascript", "typescript"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)fs\\.(?:readFile|readSync|writeFile|writeSync|unlink|open|createReadStream|createWriteStream)\\s*\\(\\s*(?:\\w+\\s*\\+\\s*[`'\"]|['\"]\\s*\\+\\s*\\w+|`[^`]*\\$\\{[^}]+\\}|\\w+)\\s*[,)]"
+
