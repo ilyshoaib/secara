@@ -201,12 +201,104 @@ def output_plain(findings: List[Finding], verbose: bool = False) -> None:
 def render_findings(
     findings: List[Finding],
     use_json: bool = False,
+    use_sarif: bool = False,
+    output_file: str | None = None,
     verbose: bool = False,
 ) -> None:
     """Main rendering entry point."""
-    if use_json:
+    if use_sarif:
+        output_sarif(findings, output_file)
+    elif use_json:
         output_json(findings)
     elif RICH_AVAILABLE:
         output_rich(findings, verbose=verbose)
     else:
         output_plain(findings, verbose=verbose)
+
+
+def output_sarif(findings: List[Finding], output_file: str | None = None) -> None:
+    """Generate SARIF v2.1.0 JSON output and write to stdout or file."""
+    # Inline import to avoid circular dependency
+    from secara import __version__
+    
+    rules = {}
+    results = []
+    
+    for f in findings:
+        if f.rule_id not in rules:
+            level = "warning"
+            if f.severity.upper() == "HIGH":
+                level = "error"
+            elif f.severity.upper() == "LOW":
+                level = "note"
+                
+            rules[f.rule_id] = {
+                "id": f.rule_id,
+                "name": f.rule_name,
+                "shortDescription": {"text": f.rule_name},
+                "fullDescription": {"text": f.description},
+                "help": {"text": f.fix},
+                "properties": {
+                    "tags": [getattr(f, "language", "unknown")],
+                    "security-severity": "9.0" if level == "error" else ("6.0" if level == "warning" else "3.0")
+                }
+            }
+            
+        result_level = "warning"
+        if f.severity.upper() == "HIGH":
+            result_level = "error"
+        elif f.severity.upper() == "LOW":
+            result_level = "note"
+
+        rel_path = _try_relative(f.file_path)
+        # Use forward slashes for cross-platform SARIF compliance
+        rel_uri = rel_path.replace("\\", "/")
+            
+        results.append({
+            "ruleId": f.rule_id,
+            "level": result_level,
+            "message": {
+                "text": f.description
+            },
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "artifactLocation": {
+                            "uri": rel_uri
+                        },
+                        "region": {
+                            "startLine": f.line_number,
+                            "snippet": {
+                                "text": f.snippet
+                            }
+                        }
+                    }
+                }
+            ]
+        })
+
+    sarif_log = {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "Secara",
+                        "informationUri": "https://github.com/secara",
+                        "semanticVersion": __version__,
+                        "rules": list(rules.values())
+                    }
+                },
+                "results": results
+            }
+        ]
+    }
+    
+    out_str = json.dumps(sarif_log, indent=2)
+    if output_file:
+        Path(output_file).write_text(out_str, encoding="utf-8")
+        print(f"SARIF results written to {output_file}")
+    else:
+        print(out_str)
+
