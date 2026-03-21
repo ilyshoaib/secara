@@ -1041,3 +1041,145 @@ class PythonAnalyzer(BaseDetector):
                 )
 
         return None
+
+    # ── Mass Assignment [A04] ─────────────────────────────────────────────────
+    def _check_mass_assignment(
+        self,
+        file_path: Path,
+        call: ast.Call,
+        tracker: PythonTaintTracker,
+        lines: list[str],
+    ) -> Finding | None:
+        chain = _attr_chain(call.func)
+        line_no = call.lineno
+
+        # Check for obj.__dict__.update(user_data)
+        if len(chain) >= 2 and chain[-2] == "__dict__" and chain[-1] == "update":
+            if call.args:
+                arg0 = call.args[0]
+                if tracker.is_arg_tainted(call) or self._arg_contains_tainted_name(arg0, tracker.tainted_names):
+                    return Finding(
+                        rule_id="MASS001",
+                        rule_name="Mass Assignment via __dict__.update()",
+                        severity="HIGH",
+                        file_path=str(file_path),
+                        line_number=line_no,
+                        snippet=self.get_snippet(lines, line_no),
+                        description=(
+                            "An object's internal __dict__ is being updated with user-controlled data. "
+                            "This allows an attacker to overwrite sensitive internal attributes "
+                            "(e.g., is_admin=True) leading to privilege escalation."
+                        ),
+                        fix=(
+                            "Use explicit attribute assignment or an allowed list of fields:\n"
+                            "  obj.name = data.get('name')\n"
+                            "  obj.email = data.get('email')"
+                        ),
+                        language="python",
+                    )
+
+        # Check for User(**user_data)
+        for kw in call.keywords:
+            if kw.arg is None:  # This means **kwargs
+                if tracker.is_arg_tainted(call) or self._arg_contains_tainted_name(kw.value, tracker.tainted_names):
+                    return Finding(
+                        rule_id="MASS002",
+                        rule_name="Mass Assignment via **kwargs",
+                        severity="MEDIUM",
+                        file_path=str(file_path),
+                        line_number=line_no,
+                        snippet=self.get_snippet(lines, line_no),
+                        description=(
+                            f"A function or constructor `{chain[0] if chain else 'func'}()` is called "
+                            "with **kwargs containing user-controlled data. "
+                            "In ORMs (like Django/SQLAlchemy), this can lead to Mass Assignment vulnerabilities "
+                            "if sensitive model fields are updated."
+                        ),
+                        fix=(
+                            "Validate and filter the input dictionary before passing it via **kwargs.\n"
+                            "Use Django form validation or Pydantic models to ensure only expected fields "
+                            "are processed."
+                        ),
+                        language="python",
+                    )
+        return None
+
+    # ── TOCTOU Race Condition [A01] ───────────────────────────────────────────
+    def _check_toctou(
+        self,
+        file_path: Path,
+        if_node: ast.If,
+        tracker: PythonTaintTracker,
+        lines: list[str],
+    ) -> Finding | None:
+        # Check if the condition is `os.path.exists(path)` or `os.path.isfile(path)`
+        test_call = None
+        if isinstance(if_node.test, ast.Call):
+            test_call = if_node.test
+        elif isinstance(if_node.test, ast.UnaryOp) and isinstance(if_node.test.op, ast.Not):
+            if isinstance(if_node.test.operand, ast.Call):
+                test_call = if_node.test.operand
+
+        if test_call:
+            chain = _attr_chain(test_call.func)
+            if len(chain) == 3 and chain[0] == "os" and chain[1] == "path" and chain[2] in ("exists", "isfile", "isdir"):
+                # Check if the body contains an `open()` call
+                for child in ast.walk(if_node):
+                    if child is if_node.test:
+                        continue
+                    if isinstance(child, ast.Call):
+                        child_chain = _attr_chain(child.func)
+                        if len(child_chain) == 1 and child_chain[0] == "open":
+                            line_no = test_call.lineno
+                            return Finding(
+                                rule_id="RACE001",
+                                rule_name="Time-of-Check Time-of-Use (TOCTOU) Race Condition",
+                                severity="MEDIUM",
+                                file_path=str(file_path),
+                                line_number=line_no,
+                                snippet=self.get_snippet(lines, line_no),
+                                description=(
+                                    f"Checking file status with os.path.{chain[2]}() before opening it "
+                                    "creates a classic TOCTOU race condition. An attacker can replace "
+                                    "the file with a symlink between the check and the open() call, "
+                                    "leading to arbitrary file read/write."
+                                ),
+                                fix=(
+                                    "Use try-except to open the file directly and handle the "
+                                    "FileNotFoundError or FileExistsError. Do not check beforehand."
+                                ),
+                                language="python",
+                            )
+        return None
+
+    # ── Insecure Temporary Files [A01] ───────────────────────────────────────
+    def _check_temp_files(
+        self,
+        file_path: Path,
+        call: ast.Call,
+        tracker: PythonTaintTracker,
+        lines: list[str],
+    ) -> Finding | None:
+        chain = _attr_chain(call.func)
+        line_no = call.lineno
+
+        if len(chain) == 2 and chain[0] == "tempfile" and chain[1] == "mktemp":
+            return Finding(
+                rule_id="TEMP001",
+                rule_name="Insecure Temporary File (tempfile.mktemp)",
+                severity="HIGH",
+                file_path=str(file_path),
+                line_number=line_no,
+                snippet=self.get_snippet(lines, line_no),
+                description=(
+                    "tempfile.mktemp() is deeply insecure and deprecated. It only generates "
+                    "a filename but does not securely create the file, leading to predictable "
+                    "temporary files and race conditions."
+                ),
+                fix=(
+                    "Use tempfile.NamedTemporaryFile() or tempfile.mkstemp() instead, "
+                    "which securely create the file with restricted permissions."
+                ),
+                language="python",
+            )
+        return None

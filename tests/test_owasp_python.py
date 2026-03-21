@@ -227,3 +227,93 @@ def test_handles_syntax_error_gracefully():
     code = "def broken(\n    this is not valid python!!!"
     findings = analyze(code)
     assert isinstance(findings, list)
+
+
+# ── Mass Assignment [MASS001 / MASS002] ───────────────────────────────────────
+
+def test_detects_mass_assignment_dict_update():
+    code = """
+def update_user(request):
+    user = User.get(id=1)
+    user.__dict__.update(request.json)
+"""
+    assert "MASS001" in rule_ids(code)
+
+
+def test_detects_mass_assignment_kwargs():
+    code = """
+def create_post(request):
+    data = request.get_json()
+    post = Post(**data)
+"""
+    assert "MASS002" in rule_ids(code)
+
+
+def test_no_mass_assignment_safe():
+    code = """
+def update_user(request):
+    user = User.get(id=1)
+    user.name = request.json['name']
+"""
+    assert not any(r for r in rule_ids(code) if r.startswith("MASS"))
+
+
+# ── TOCTOU Race Condition [RACE001] ───────────────────────────────────────────
+
+def test_detects_toctou_exists_open():
+    code = """
+import os
+def read_config(path):
+    if os.path.exists(path):
+        with open(path) as f:
+            return f.read()
+"""
+    assert "RACE001" in rule_ids(code)
+
+
+def test_detects_toctou_isfile_open():
+    code = """
+import os
+def read_config(path):
+    if not os.path.isfile(path):
+        return None
+    with open(path) as f:
+        return f.read()
+"""
+    assert "RACE001" in rule_ids(code)
+
+
+def test_no_toctou_safe_open():
+    code = """
+def read_config(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+"""
+    assert "RACE001" not in rule_ids(code)
+
+
+# ── Insecure Temporary Files [TEMP001] ────────────────────────────────────────
+
+def test_detects_tempfile_mktemp():
+    code = """
+import tempfile
+def write_temp(data):
+    filename = tempfile.mktemp()
+    with open(filename, 'w') as f:
+        f.write(data)
+"""
+    assert "TEMP001" in rule_ids(code)
+
+
+def test_no_tempfile_safemk():
+    code = """
+import tempfile
+def write_temp(data):
+    with tempfile.NamedTemporaryFile() as f:
+        f.write(data)
+"""
+    assert "TEMP001" not in rule_ids(code)
+
