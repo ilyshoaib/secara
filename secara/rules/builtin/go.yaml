@@ -36,9 +36,9 @@ rules:
   - id: PATH004
     name: "Path Traversal (Go)"
     severity: MEDIUM
-    description: "File operation with dynamically constructed path. Prevent path traversal using `filepath.Clean()` and verifying the resulting path starts with an allowed base directory."
+    description: "File operation with dynamically constructed path."
     fix: "Audit the input flowing into this function and apply safe usage patterns."
     languages: ["go"]
     pattern_type: "regex"
     pattern:
-      regex: "(?ix)os\\.(?:Open|OpenFile|ReadFile|WriteFile|Remove|RemoveAll)\\s*\\(\\s*(?:[a-zA-Z0-9_]+(?:\\.Path|\\.String\\(\\))?|(?:filepath\\.Join\\s*\\([^)]+\\)))"
+      regex: "(?ix)os\\.(?:Open|OpenFile|ReadFile|WriteFile|Remove|RemoveAll)\\s*\\(\\s*[^)]*(?:req\\.|r\\.|ctx\\.|c\\.|body|query|param|input)"

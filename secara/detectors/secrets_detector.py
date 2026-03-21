@@ -156,10 +156,25 @@ class SecretsDetector(BaseDetector):
         self, file_path: Path, line: str, line_no: int
     ) -> List[Finding]:
         results = []
+        
+        # Heuristic: Skip enormously long lines > 500 characters (minified code / chunks)
+        if len(line) > 500:
+            return results
+
         for match in _ENTROPY_CANDIDATE.finditer(line):
             value = match.group("value")
             if len(value) < MIN_LENGTH_FOR_ENTROPY:
                 continue
+            
+            # Heuristic: Pure hex strings max out at ~4 entropy, but if long enough they trigger false flags
+            # Commonly used for MD5/SHA1/Commit IDs, not usually secrets
+            if re.fullmatch(r"[a-fA-F0-9]+", value):
+                continue
+                
+            # Heuristic: base64 image data URIs
+            if "data:image/" in line or "application/" in line:
+                continue
+
             entropy = _shannon_entropy(value)
             if entropy >= ENTROPY_THRESHOLD:
                 # Skip Base64 padding of template strings

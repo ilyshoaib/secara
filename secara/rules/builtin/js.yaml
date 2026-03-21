@@ -130,10 +130,10 @@ rules:
   - id: PATH101
     name: "Path Traversal via fs module"
     severity: HIGH
-    description: "Detected file system operation with dynamically constructed path."
+    description: "Detected file system operation with user-controlled path variable."
     fix: "Sanitize paths using path.basename() or validate them against an allowlist."
     languages: ["javascript", "typescript"]
     pattern_type: "regex"
     pattern:
-      regex: "(?ix)fs\\.(?:readFile|readSync|writeFile|writeSync|unlink|open|createReadStream|createWriteStream)\\s*\\(\\s*(?:\\w+\\s*\\+\\s*[`'\"]|['\"]\\s*\\+\\s*\\w+|`[^`]*\\$\\{[^}]+\\}|\\w+)\\s*[,)]"
+      regex: "(?ix)fs\\.(?:readFile|readSync|writeFile|writeSync|unlink|open|createReadStream|createWriteStream)\\s*\\(\\s*(?:[^)]*(?:req\\.|request\\.|params\\.|query\\.|body\\.|location\\.|ctx\\.|userInput|\\w+Input|\\w+Param|\\w+Data|\\w+Id))"
 
