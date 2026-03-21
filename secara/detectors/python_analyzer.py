@@ -1119,37 +1119,75 @@ class PythonAnalyzer(BaseDetector):
     ) -> Finding | None:
         # Check if the condition is `os.path.exists(path)` or `os.path.isfile(path)`
         test_call = None
+        is_negated = False
         if isinstance(if_node.test, ast.Call):
             test_call = if_node.test
         elif isinstance(if_node.test, ast.UnaryOp) and isinstance(if_node.test.op, ast.Not):
             if isinstance(if_node.test.operand, ast.Call):
                 test_call = if_node.test.operand
-
+                is_negated = True
+        
         if test_call:
             chain = _attr_chain(test_call.func)
-            if len(chain) == 3 and chain[0] == "os" and chain[1] == "path" and chain[2] in self.toctou_checks:
-                # Check if the body contains an `open()` call
-                for child in ast.walk(if_node):
-                    if child is if_node.test:
-                        continue
-                    if isinstance(child, ast.Call):
-                        child_chain = _attr_chain(child.func)
-                        if len(child_chain) == 1 and child_chain[0] == "open":
-                            if "RACE001" not in self.yaml_rules: return None
-                            rule = self.yaml_rules["RACE001"]
-                            line_no = test_call.lineno
-                            return Finding(
-                                rule_id=rule.id,
-                                rule_name=rule.name,
-                                severity=rule.severity,
-                                file_path=str(file_path),
-                                line_number=line_no,
-                                snippet=self.get_snippet(lines, line_no),
-                                description=rule.description,
-                                fix=rule.fix,
-                                language="python",
-                            )
+            if len(chain) >= 2 and chain[-2] == "path" and chain[-1] in self.toctou_checks:
+                # Track this path for sequential checks in the same scope
+                arg_str = ""
+                if test_call.args:
+                    arg_str = ast.dump(test_call.args[0])
+                    checked_paths[arg_str] = test_call
+
+                # Case 1: if exists(path): open(path) -- captured within this block
+                if not is_negated:
+                    for child in ast.walk(if_node):
+                        if child is if_node.test: continue
+                        if isinstance(child, ast.Call):
+                            child_chain = _attr_chain(child.func)
+                            if len(child_chain) == 1 and child_chain[0] == "open":
+                                # Open the same path?
+                                if child.args and ast.dump(child.args[0]) == arg_str:
+                                    if "RACE001" not in self.yaml_rules: return None
+                                    rule = self.yaml_rules["RACE001"]
+                                    return Finding(
+                                        rule_id=rule.id,
+                                        rule_name=rule.name,
+                                        severity=rule.severity,
+                                        file_path=str(file_path),
+                                        line_number=test_call.lineno,
+                                        snippet=self.get_snippet(lines, test_call.lineno),
+                                        description=rule.description,
+                                        fix=rule.fix,
+                                        language="python",
+                                    )
         return None
+
+    def _check_toctou_sequential(
+        self,
+        file_path: Path,
+        call: ast.Call,
+        checked_paths: dict[str, ast.Call],
+        lines: list[str],
+    ) -> Finding | None:
+        """Checks for an open() call that follows a file check in the same scope (guard clause pattern)."""
+        chain = _attr_chain(call.func)
+        if len(chain) == 1 and chain[0] == "open" and call.args:
+            arg_str = ast.dump(call.args[0])
+            if arg_str in checked_paths:
+                test_call = checked_paths[arg_str]
+                if "RACE001" not in self.yaml_rules: return None
+                rule = self.yaml_rules["RACE001"]
+                return Finding(
+                    rule_id=rule.id,
+                    rule_name=rule.name,
+                    severity=rule.severity,
+                    file_path=str(file_path),
+                    line_number=call.lineno,
+                    snippet=self.get_snippet(lines, call.lineno),
+                    description=f"Sequential TOCTOU: Path was checked at line {test_call.lineno} and then opened.\n{rule.description}",
+                    fix=rule.fix,
+                    language="python",
+                )
+        return None
+
 
     # ── Insecure Temporary Files [A01] ───────────────────────────────────────
     def _check_temp_files(
