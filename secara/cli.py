@@ -23,6 +23,7 @@ from secara.detectors.python_analyzer import PythonAnalyzer
 from secara.detectors.js_analyzer import JSAnalyzer
 from secara.detectors.shell_analyzer import ShellAnalyzer
 from secara.detectors.config_analyzer import ConfigAnalyzer
+from secara.detectors.go_analyzer import GoAnalyzer
 from secara.output.models import Finding
 from secara.output.formatter import render_findings, filter_findings
 
@@ -45,6 +46,7 @@ _PYTHON_ANALYZER  = PythonAnalyzer()
 _JS_ANALYZER      = JSAnalyzer()
 _SHELL_ANALYZER   = ShellAnalyzer()
 _CONFIG_ANALYZER  = ConfigAnalyzer()
+_GO_ANALYZER      = GoAnalyzer()
 
 
 def _analyze_file(file_path: Path, cache: FileCache) -> List[Finding]:
@@ -87,6 +89,8 @@ def _analyze_file(file_path: Path, cache: FileCache) -> List[Finding]:
             findings.extend(_SHELL_ANALYZER.analyze(file_path, content))
         elif language in {"json", "yaml"}:
             findings.extend(_CONFIG_ANALYZER.analyze(file_path, content))
+        elif language == "go":
+            findings.extend(_GO_ANALYZER.analyze(file_path, content))
 
     # ── Secrets-only tier ─────────────────────────────────────────────────
     elif tier == LanguageTier.SECRETS_ONLY:
