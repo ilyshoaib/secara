@@ -26,17 +26,13 @@ from typing import List, Union
 from secara.detectors.base import BaseDetector
 from secara.output.models import Finding
 from secara.taint.python_taint import PythonTaintTracker, _is_taint_source
+from secara.rules.rule_loader import get_rules_for_language
 
 logger = logging.getLogger("secara.python")
 
 FunctionNode = Union[ast.FunctionDef, ast.AsyncFunctionDef]
 
-# ── SQL sink function names ───────────────────────────────────────────────────
-_SQL_EXECUTE_ATTRS = {
-    "execute", "executemany", "executescript", "raw", "query",
-}
-
-# ── Subprocess / OS sink function chains ─────────────────────────────────────
+# YAML configurations will be loaded into PythonAnalyzer instance
 _SUBPROCESS_DANGEROUS = {
     "call", "run", "Popen", "check_output", "check_call", "getoutput",
 }
@@ -143,6 +139,26 @@ def _name_looks_sensitive(name: str) -> bool:
 
 class PythonAnalyzer(BaseDetector):
     """Full AST-based security analysis for Python files — OWASP Top 10 coverage."""
+
+    def __init__(self):
+        super().__init__()
+        rules = get_rules_for_language("python")
+        self.yaml_rules = {r.id: r for r in rules if r.pattern_type == "ast_sink"}
+        
+        def _get_funcs(rule_id):
+            return set(self.yaml_rules[rule_id].pattern.get("functions", [])) if rule_id in self.yaml_rules else set()
+            
+        self.sql_execute_attrs = _get_funcs("SQL001")
+        self.os_dangerous = _get_funcs("CMD001")
+        self.subprocess_dangerous = _get_funcs("CMD002")
+        self.eval_exec_names = _get_funcs("CMD003")
+        self.requests_methods = _get_funcs("SSRF001")
+        self.deser_loads = _get_funcs("DSER001")
+        self.yaml_loads = _get_funcs("DSER004")
+        self.weak_hash = _get_funcs("CRY001")
+        self.weak_prng = _get_funcs("CRY003")
+        self.path_open = _get_funcs("PATH001")
+        self.path_send = _get_funcs("PATH002")
 
     def analyze(self, file_path: Path, content: str) -> List[Finding]:
         findings: List[Finding] = []
@@ -284,8 +300,11 @@ class PythonAnalyzer(BaseDetector):
         tracker: PythonTaintTracker,
         lines: list[str],
     ) -> Finding | None:
+        if "SQL001" not in self.yaml_rules: return None
+        rule = self.yaml_rules["SQL001"]
+        
         func = call.func
-        if not (isinstance(func, ast.Attribute) and func.attr in _SQL_EXECUTE_ATTRS):
+        if not (isinstance(func, ast.Attribute) and func.attr in self.sql_execute_attrs):
             return None
 
         if not call.args:
@@ -311,23 +330,14 @@ class PythonAnalyzer(BaseDetector):
 
         line_no = call.lineno
         return Finding(
-            rule_id="SQL001",
-            rule_name="SQL Injection via String Concatenation",
-            severity="HIGH",
+            rule_id=rule.id,
+            rule_name=rule.name,
+            severity=rule.severity,
             file_path=str(file_path),
             line_number=line_no,
             snippet=self.get_snippet(lines, line_no),
-            description=(
-                "A database execute() call uses a dynamically built query string. "
-                "String concatenation or f-strings with user-controlled input in SQL "
-                "queries allows attackers to inject arbitrary SQL, potentially "
-                "bypassing authentication or exfiltrating the entire database."
-            ),
-            fix=(
-                "Use parameterized queries (prepared statements) instead:\n"
-                "  cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))\n"
-                "Never build SQL strings with f-strings, %-formatting, or + concatenation."
-            ),
+            description=rule.description,
+            fix=rule.fix,
             language="python",
         )
 
@@ -351,29 +361,23 @@ class PythonAnalyzer(BaseDetector):
         line_no = call.lineno
 
         # ── os.system / os.popen ──────────────────────────────────────────
-        if isinstance(func, ast.Attribute) and func.attr in _OS_DANGEROUS:
+        if isinstance(func, ast.Attribute) and func.attr in self.os_dangerous:
             chain = _attr_chain(func.value) if isinstance(func.value, ast.Attribute) \
                 else [func.value.id] if isinstance(func.value, ast.Name) else []
             if chain and chain[-1] == "os" and call.args:
                 arg0 = call.args[0]
                 if _is_dynamic_string(arg0, tracker.tainted_names):
+                    if "CMD001" not in self.yaml_rules: return None
+                    rule = self.yaml_rules["CMD001"]
                     return Finding(
-                        rule_id="CMD001",
-                        rule_name="Command Injection via os.system / os.popen",
-                        severity="HIGH",
+                        rule_id=rule.id,
+                        rule_name=rule.name,
+                        severity=rule.severity,
                         file_path=str(file_path),
                         line_number=line_no,
                         snippet=self.get_snippet(lines, line_no),
-                        description=(
-                            f"os.{func.attr}() is called with a dynamically constructed "
-                            "command string. If any part of the string is user-controlled, "
-                            "an attacker can inject arbitrary OS commands."
-                        ),
-                        fix=(
-                            "Use subprocess.run() with a list of arguments "
-                            "(NOT shell=True) and never interpolate user input into commands:\n"
-                            "  subprocess.run(['ls', user_dir], capture_output=True)"
-                        ),
+                        description=rule.description,
+                        fix=rule.fix,
                         language="python",
                     )
 
