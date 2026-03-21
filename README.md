@@ -33,11 +33,13 @@ It runs fully **offline**, requires **no cloud APIs**, and is built to scale acr
 | 🖥️ **Command Injection** | `os.system`, `subprocess` with `shell=True`, `exec()`, `eval()` |
 | 🐍 **Python (Tier 1)** | Full AST analysis + single-function taint tracking |
 | 🌐 **JavaScript / TypeScript (Tier 1)** | Regex-AST hybrid, no compiled dependencies |
+| 🐹 **Go (Tier 2)** | Basic regex-based AST parsing (SQLi, CMDi, SSRF) |
 | 🐚 **Bash / Shell (Tier 2)** | Eval injection, unsafe substitution patterns |
 | ⚙️ **JSON / YAML / .env (Tier 2)** | Config file plaintext credential detection |
 | ⚡ **Parallel Scanning** | ThreadPoolExecutor for fast multi-file processing |
 | 💾 **Smart Cache** | SHA-256 file cache skips unchanged files |
 | 🎨 **Beautiful Output** | Rich terminal UI, JSON mode, severity filtering |
+| 🛠️ **CI/CD Ready** | Generate standard SARIF files for GitHub Actions Code Scanning |
 
 ---
 
@@ -124,6 +126,8 @@ Usage: secara scan [OPTIONS] PATH
 
 Options:
   --json            Output results as JSON (machine-readable)
+  --sarif           Output results as SARIF v2.1.0 for GitHub CI/CD integration
+  -o, --output      Write output to file (useful with --sarif or --json)
   -v, --verbose     Show full descriptions and fix details
   -s, --severity    Minimum severity: HIGH | MEDIUM | LOW  [default: LOW]
   --no-cache        Disable file cache (re-scan everything)
@@ -146,6 +150,9 @@ secara scan ./src --verbose
 
 # Machine-readable JSON for CI integration
 secara scan . --json | jq '.[] | select(.severity == "HIGH")'
+
+# Generate SARIF for GitHub Code Scanning
+secara scan . --sarif --output secara-results.sarif
 
 # Force re-scan (ignore cache)
 secara scan . --no-cache
@@ -196,6 +203,7 @@ secara scan /large/repo --workers 16
 |---------|--------------|-----------|----------|
 | SQL001 | SQLi via String Concat / f-string | Python AST | HIGH |
 | SQL002 | SQLi via Concat / Template Literal | JavaScript | HIGH |
+| SQL005 | SQLi via string construction in `db.Query` | Go | HIGH |
 
 ### 🖥️ Command Injection
 
@@ -210,6 +218,7 @@ secara scan /large/repo --workers 16
 | CMD104 | `eval()` with non-literal arg | JavaScript | HIGH |
 | CMD105 | Prototype Pollution (direct `__proto__` access) | JavaScript | MEDIUM |
 | CMD107 | Prototype Pollution via `Object.assign(obj, req.body)` | JavaScript | HIGH |
+| CMD005 | `exec.Command` with dynamic strings and `sh -c` | Go | HIGH |
 | SH001 | `eval` with variable in shell script | Bash | HIGH |
 | SH002 | Unsafe backtick substitution | Bash | HIGH |
 | SH004 | Dangerous command with unquoted variable | Bash | HIGH |
@@ -230,6 +239,7 @@ secara scan /large/repo --workers 16
 |---------|--------------|-----------|----------|
 | SSRF001 | `requests.get/post(user_url)` — tainted URL | Python | HIGH |
 | SSRF002 | `fetch/axios.get(user_url)` — tainted URL | JavaScript | HIGH |
+| SSRF003 | `http.Get` with dynamic strings | Go | HIGH |
 
 ### 💣 Insecure Deserialization [OWASP A08]
 
@@ -249,6 +259,7 @@ secara scan /large/repo --workers 16
 | PATH001 | `open(user_input)` — directory traversal | Python | HIGH |
 | PATH002 | Flask `send_file(user_input)` | Python | HIGH |
 | PATH003 | `fs.readFile/writeFile` with dynamic path | JavaScript | HIGH |
+| PATH004 | `os.Open` with dynamic path | Go | MEDIUM |
 
 ### 🎯 Injection — Extended [OWASP A03]
 
@@ -264,6 +275,10 @@ secara scan /large/repo --workers 16
 | Rule ID | Vulnerability | Languages | Severity |
 |---------|--------------|-----------|----------|
 | LOG001 | Sensitive variable (password/token) passed to logger | Python | MEDIUM |
+| TEMP001 | Insecure Temporary File via `tempfile.mktemp()` | Python | HIGH |
+| RACE001 | TOCTOU check via `os.path.exists()` before `open()` | Python | MEDIUM |
+| MASS001 | Mass Assignment via `__dict__.update(user_data)` | Python | HIGH |
+| MASS002 | Mass Assignment via `**kwargs` in ORM creation | Python | MEDIUM |
 
 ### ⚙️ Security Misconfiguration [OWASP A05]
 
@@ -361,16 +376,16 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## 🗺️ Roadmap
 
-- [ ] Go language support (Tier 1)
+- [x] Go language support (Tier 2/Regex)
 - [ ] Ruby / PHP support (Tier 2)
-- [ ] SARIF output format (GitHub Code Scanning compatible)
+- [x] SARIF output format (GitHub Code Scanning compatible)
 - [ ] GitHub Actions workflow
 - [ ] VS Code extension
 - [ ] Interprocedural taint analysis
 - [ ] Custom rule authoring (YAML)
-- [ ] Path traversal detection
-- [ ] SSRF detection
-- [ ] Insecure deserialization detection
+- [x] Path traversal detection
+- [x] SSRF detection
+- [x] Insecure deserialization detection
 
 ---
 
