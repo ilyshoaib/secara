@@ -1,0 +1,44 @@
+rules:
+  # ── SQL Injection ────────────────────────────────────────────────────────
+  - id: SQL005
+    name: "SQL Injection via String Concatenation (Go)"
+    severity: HIGH
+    description: "A database query is constructed dynamically using string formatting or concatenation. Use `db.Query('SELECT * FROM users WHERE id = ?', id)` parameterized queries."
+    fix: "Audit the input flowing into this function and apply safe usage patterns."
+    languages: ["go"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:db\\.|tx\\.)(?:Query|QueryRow|Exec|Prepare|ExecContext|QueryContext)\\s*\\(.*?(?:fmt\\.Sprintf\\s*\\(|(?:\\w+\\s*\\+\\s*)+|\\+\\s*\\w+)"
+
+  # ── Command Injection (OS) ────────────────────────────────────────────────
+  - id: CMD005
+    name: "Command Injection via exec.Command (Go)"
+    severity: HIGH
+    description: "exec.Command is used with 'sh -c' and dynamic input. This allows arbitrary command execution. Avoid shells where possible and pass arguments as separate array elements."
+    fix: "Use exec.Command('ls', '-la', userDir) instead of executing sh/bash."
+    languages: ["go"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)exec\\.Command(?:Context)?\\s*\\(\\s*(?:[\"'`]sh[\"'`]\\s*,\\s*[\"'`]-c[\"'`]|[\"'`]bash[\"'`]\\s*,\\s*[\"'`]-c[\"'`]|[\"'`]cmd[\"'`]\\s*,\\s*[\"'`]/c[\"'`])\\s*,[^)]*?(?:[a-zA-Z0-9_\\-]+|\\(.*?\\))\\s*\\)"
+
+  # ── SSRF ─────────────────────────────────────────────────────────────────
+  - id: SSRF003
+    name: "Server-Side Request Forgery / SSRF (Go)"
+    severity: HIGH
+    description: "http.Get or similar method is called with a dynamically constructed URL. Validate user-provided URLs against an allowlist and block private IP address resolution."
+    fix: "Audit the input flowing into this function and apply safe usage patterns."
+    languages: ["go"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)http\\.(?:Get|Post|Head|Do)\\s*\\(\\s*(?:[a-zA-Z0-9_]+(?:\\.URL|\\.String\\(\\))?|(?:fmt\\.Sprintf\\s*\\([^)]+\\)))\\s*\\)"
+
+  # ── Path Traversal ───────────────────────────────────────────────────────
+  - id: PATH004
+    name: "Path Traversal (Go)"
+    severity: MEDIUM
+    description: "File operation with dynamically constructed path. Prevent path traversal using `filepath.Clean()` and verifying the resulting path starts with an allowed base directory."
+    fix: "Audit the input flowing into this function and apply safe usage patterns."
+    languages: ["go"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)os\\.(?:Open|OpenFile|ReadFile|WriteFile|Remove|RemoveAll)\\s*\\(\\s*(?:[a-zA-Z0-9_]+(?:\\.Path|\\.String\\(\\))?|(?:filepath\\.Join\\s*\\([^)]+\\)))"
