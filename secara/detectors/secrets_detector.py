@@ -40,25 +40,25 @@ KNOWN_TOKEN_PATTERNS: list[tuple[str, str, str, str]] = [
         "SEC002",
         "Hardcoded GitHub Personal Access Token",
         "HIGH",
-        r"ghp_[a-zA-Z0-9]{36}",
+        r"ghp_[a-zA-Z0-9]{30,}",
     ),
     (
         "SEC003",
         "Hardcoded GitHub OAuth Token",
         "HIGH",
-        r"gho_[a-zA-Z0-9]{36}",
+        r"gho_[a-zA-Z0-9]{30,}",
     ),
     (
         "SEC004",
         "Hardcoded GitHub Actions Token",
         "HIGH",
-        r"ghs_[a-zA-Z0-9]{36}",
+        r"ghs_[a-zA-Z0-9]{30,}",
     ),
     (
         "SEC004B",
         "Hardcoded GitHub Fine-Grained Token",
         "HIGH",
-        r"github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}",
+        r"github_pat_[a-zA-Z0-9\_]{50,}",
     ),
     # ── GitLab ─────────────────────────────────────────────────────────────────
     (
@@ -72,13 +72,13 @@ KNOWN_TOKEN_PATTERNS: list[tuple[str, str, str, str]] = [
         "SEC005",
         "Hardcoded Stripe Live Secret Key",
         "HIGH",
-        r"sk_live_[0-9a-zA-Z]{24,}",
+        r"sk_live_[0-9a-zA-Z]{15,}",
     ),
     (
         "SEC006",
         "Hardcoded Stripe Test Key",
         "MEDIUM",
-        r"sk_test_[0-9a-zA-Z]{24,}",
+        r"sk_test_[0-9a-zA-Z]{15,}",
     ),
     # ── Slack ──────────────────────────────────────────────────────────────────
     (
@@ -91,7 +91,7 @@ KNOWN_TOKEN_PATTERNS: list[tuple[str, str, str, str]] = [
         "SEC007B",
         "Hardcoded Slack Webhook URL",
         "HIGH",
-        r"hooks\.slack\.com/services/[A-Za-z0-9/]{44,}",
+        r"hooks\.slack\.com/services/[A-Za-z0-9/]{30,}",
     ),
     # ── Private Keys ───────────────────────────────────────────────────────────
     (
@@ -112,19 +112,19 @@ KNOWN_TOKEN_PATTERNS: list[tuple[str, str, str, str]] = [
         "SEC010",
         "Hardcoded Google API Key",
         "HIGH",
-        r"AIza[0-9A-Za-z\-_]{35}",
+        r"AIza[0-9A-Za-z\-_]{30,}",
     ),
     (
         "SEC010B",
         "Hardcoded Google OAuth Client Secret",
         "HIGH",
-        r"GOCSPX-[a-zA-Z0-9\-_]{28}",
+        r"GOCSPX-[a-zA-Z0-9\-_]{20,}",
     ),
     (
         "SEC010C",
         "Hardcoded GCP Service Account Key (JSON)",
         "HIGH",
-        r""""private_key_id"\s*:\s*"[a-f0-9]{40}""",
+        r""""private_key_id"\s*:\s*"[a-f0-9]{30,}""",
     ),
     # ── Firebase ───────────────────────────────────────────────────────────────
     (
@@ -158,47 +158,47 @@ KNOWN_TOKEN_PATTERNS: list[tuple[str, str, str, str]] = [
         "SEC015",
         "Hardcoded OpenAI API Key",
         "HIGH",
-        r"sk-[a-zA-Z0-9]{48}",
+        r"sk-[a-zA-Z0-9]{30,}",
     ),
     (
         "SEC015B",
         "Hardcoded OpenAI Project/Org Key",
         "HIGH",
-        r"sk-proj-[a-zA-Z0-9\-_]{80,}",
+        r"sk-proj-[a-zA-Z0-9\-_]{40,}",
     ),
     # ── Anthropic ──────────────────────────────────────────────────────────────
     (
         "SEC016",
         "Hardcoded Anthropic API Key",
         "HIGH",
-        r"sk-ant-[a-zA-Z0-9\-_]{90,}",
+        r"sk-ant-[a-zA-Z0-9\-_]{40,}",
     ),
     # ── Azure ──────────────────────────────────────────────────────────────────
     (
         "SEC017",
         "Hardcoded Azure Storage Account Key",
         "HIGH",
-        r"DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]{88}",
+        r"DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]{80,}",
     ),
     (
         "SEC017B",
         "Hardcoded Azure SAS Token",
         "HIGH",
-        r"sv=\d{4}-\d{2}-\d{2}&s[a-z]=\w+&sig=[A-Za-z0-9+/%]{40,}",
+        r"sv=\d{4}-\d{2}-\d{2}&s[a-z]=\w+&sig=[A-Za-z0-9+/%]{30,}",
     ),
     # ── npm ────────────────────────────────────────────────────────────────────
     (
         "SEC018",
         "Hardcoded npm Auth Token",
         "HIGH",
-        r"npm_[a-zA-Z0-9]{36}",
+        r"npm_[a-zA-Z0-9]{30,}",
     ),
     # ── Cloudflare ─────────────────────────────────────────────────────────────
     (
         "SEC019",
         "Hardcoded Cloudflare API Token",
         "HIGH",
-        r"(?i)cloudflare.{0,30}['\":\s=]+[A-Za-z0-9_\-]{40}",
+        r"(?i)cloudflare.{0,30}['\":\s=]+[A-Za-z0-9_\-]{30,}",
     ),
     # ── Telegram ───────────────────────────────────────────────────────────────
     (
@@ -233,14 +233,14 @@ KNOWN_TOKEN_PATTERNS: list[tuple[str, str, str, str]] = [
         "SEC024",
         "Hardcoded PyPI Token",
         "HIGH",
-        r"pypi-AgEIcHlwaS5vcmc[a-zA-Z0-9\-_]{200,}",
+        r"pypi-AgEIcHlwaS5vcmc[a-zA-Z0-9\-_]{100,}",
     ),
     # ── HuggingFace ────────────────────────────────────────────────────────────
     (
         "SEC025",
         "Hardcoded HuggingFace API Token",
         "HIGH",
-        r"hf_[a-zA-Z0-9]{30,}",
+        r"hf_[a-zA-Z0-9]{25,}",
     ),
     # ── Databricks ─────────────────────────────────────────────────────────────
     (
@@ -299,7 +299,7 @@ KNOWN_TOKEN_PATTERNS: list[tuple[str, str, str, str]] = [
 ]
 
 # ── Generic keyword-proximity patterns ────────────────────────────────────────
-# Match: key_word = "value"  (various quote styles)
+# Match: key_word = "value" or key_word=value
 _KEYWORD_PATTERN = re.compile(
     r"""(?ix)
     (?:^|\s|,|;|\()                    # word boundary or statement start
@@ -310,7 +310,7 @@ _KEYWORD_PATTERN = re.compile(
            db[_\-]?pass(?:word)?|database[_\-]?password)
     )
     \s*[:=]\s*
-    (?P<quote>['"`])
+    (?P<quote>['"`]?)
     (?P<value>[^'"`\s]{6,200})         # at least 6 chars, not a template
     (?P=quote)
     """,
@@ -323,7 +323,7 @@ _PLACEHOLDER_VALUES = {
     "replace_me", "xxx", "yyy", "placeholder", "example",
     "your-key-here", "insert_key_here", "<key>", "<secret>",
     "none", "null", "undefined", "false", "true",
-    "<your_api_key>", "<your_token>",
+    "<your_api_key>", "<your_token>", "your_password", "your_api_key_here",
 }
 
 # ── Shannon entropy ───────────────────────────────────────────────────────────

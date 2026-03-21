@@ -166,7 +166,7 @@ class PythonAnalyzer(BaseDetector):
 
         # Also check bare module-level calls (scripts, not just functions)
         module_tracker = PythonTaintTracker()
-        self._analyze_body(file_path, tree.body, module_tracker, lines, findings)
+        self._analyze_body(file_path, ast.walk(tree), module_tracker, lines, findings)
 
         # De-duplicate (same file + line + rule)
         seen = set()
