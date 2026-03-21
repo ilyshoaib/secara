@@ -43,7 +43,29 @@ It runs fully **offline**, requires **no cloud APIs**, and is built to scale acr
 
 ## 🚀 Quick Start
 
-### Install from source (recommended for now)
+### Linux / macOS — One-line install (recommended)
+
+```bash
+git clone https://github.com/ilyshoaib/secara.git
+cd secara
+bash install.sh
+```
+
+The installer will:
+- Install secara from source
+- **Automatically add `~/.local/bin` to your PATH** (in `.bashrc`, `.zshrc`, or `.profile`)
+- Verify the `secara` command works
+
+Then reload your shell and you're done:
+
+```bash
+source ~/.bashrc   # or source ~/.zshrc if using zsh
+secara scan .
+```
+
+---
+
+### Manual install (all platforms)
 
 ```bash
 git clone https://github.com/ilyshoaib/secara.git
@@ -51,11 +73,28 @@ cd secara
 pip install -e .
 ```
 
-This installs secara as a local editable package and registers the `secara`
-command in your terminal. No restart needed.
+**If `secara` command is not found after install** (common on Linux):
 
-> **PyPI release coming soon** — once published, you'll be able to install
-> with `pip install secara`.
+```bash
+# Check where pip installed the script
+python3 -c "import site; print(site.getusersitepackages())"
+
+# Add ~/.local/bin to your PATH permanently
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/ilyshoaib/secara.git
+cd secara
+pip install -e .
+# The secara command is available immediately — no PATH fix needed
+secara scan .
+```
+
+> **PyPI release coming soon** — once published, installation will be simply `pip install secara`.
 
 ### Scan a directory
 
