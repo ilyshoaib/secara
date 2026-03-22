@@ -31,7 +31,9 @@ def load_builtin_rules() -> None:
                         fix=rule_dict.get("fix", ""),
                         languages=rule_dict.get("languages", []),
                         pattern_type=rule_dict.get("pattern_type") or rule_dict.get("pattern", {}).get("type", "unknown"),
-                        pattern=rule_dict.get("pattern", {})
+                        pattern=rule_dict.get("pattern", {}),
+                        cwe=rule_dict.get("cwe"),
+                        references=rule_dict.get("references", []),
                     )
                     
                     # Store by language

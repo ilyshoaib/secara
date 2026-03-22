@@ -26,9 +26,11 @@ from secara.detectors.config_analyzer import ConfigAnalyzer
 from secara.detectors.go_analyzer import GoAnalyzer
 from secara.output.models import Finding
 from secara.output.formatter import render_findings, filter_findings
+from secara.config import load_config
 
 # ── IGNORE ANNOTATION ────────────────────────────────────────────────────────
-IGNORE_COMMENT = "secara: ignore"
+IGNORE_COMMENT = "secara: ignore"   # suppresses all findings on this line
+# Also supports: secara: ignore[SQL001,CMD001]  — suppress specific rules only
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 def _configure_logging(verbose: bool) -> None:
@@ -49,13 +51,34 @@ _CONFIG_ANALYZER  = ConfigAnalyzer()
 _GO_ANALYZER      = GoAnalyzer()
 
 
-def _analyze_file(file_path: Path, cache: FileCache) -> List[Finding]:
+def _is_suppressed(line: str, rule_id: str) -> bool:
+    """Return True if the line has a secara ignore annotation that covers rule_id."""
+    if IGNORE_COMMENT not in line:
+        return False
+    # Generic suppress — no rule list
+    if f"{IGNORE_COMMENT}[" not in line:
+        return True
+    # Rule-specific suppress: secara: ignore[SQL001,CMD002]
+    import re
+    m = re.search(r"secara:\s*ignore\[([^\]]+)\]", line)
+    if m:
+        suppressed_ids = {r.strip() for r in m.group(1).split(",")}
+        return rule_id in suppressed_ids
+    return True
+
+
+def _analyze_file(file_path: Path, cache: "FileCache", cfg=None) -> List[Finding]:
     """
     Run all applicable detectors on *file_path*.
     Returns an empty list on any error.
     """
-    # ── Ignore annotation check ───────────────────────────────────────────
-    # Check first line of file for file-level suppress
+    if cfg is None:
+        cfg = load_config()
+
+    # ── Path exclusion check ──────────────────────────────────────────────
+    if cfg.is_path_excluded(file_path, Path.cwd()):
+        return []
+
     try:
         content = file_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -96,18 +119,23 @@ def _analyze_file(file_path: Path, cache: FileCache) -> List[Finding]:
     elif tier == LanguageTier.SECRETS_ONLY:
         findings.extend(_CONFIG_ANALYZER.analyze(file_path, content))
 
-    # ── Filter inline ignores ─────────────────────────────────────────────
+    # ── Filter inline ignores + config-disabled rules ─────────────────────
     lines = content.splitlines()
     filtered = []
     for f in findings:
+        # Config-level rule disable
+        if cfg.is_rule_disabled(f.rule_id):
+            continue
+        # Inline suppression
         line_idx = f.line_number - 1
         if 0 <= line_idx < len(lines):
-            if IGNORE_COMMENT in lines[line_idx]:
+            if _is_suppressed(lines[line_idx], f.rule_id):
                 continue
         filtered.append(f)
 
     cache.set(file_path, filtered)
     return filtered
+
 
 
 # ── CLI Definition ────────────────────────────────────────────────────────────
@@ -194,6 +222,9 @@ def scan_command(
     """
     _configure_logging(verbose)
 
+    # ── Load project config ───────────────────────────────────────────────
+    cfg = load_config(path if path.is_dir() else path.parent)
+
     # ── Banner (non-JSON mode) ────────────────────────────────────────────
     if not use_json and not sarif:
         try:
@@ -224,10 +255,13 @@ def scan_command(
         sys.exit(0)
 
     # ── Parallel scan ─────────────────────────────────────────────────────
-    def analyze(fp: Path) -> List[Finding]:
-        return _analyze_file(fp, cache)
+    # CLI --workers flag overrides secara.yaml workers
+    effective_workers = workers if workers != 8 else cfg.workers
 
-    all_findings = scan_files_parallel(files, analyze, max_workers=workers)
+    def analyze(fp: Path) -> List[Finding]:
+        return _analyze_file(fp, cache, cfg)
+
+    all_findings = scan_files_parallel(files, analyze, max_workers=effective_workers)
 
     # ── Persist cache ─────────────────────────────────────────────────────
     cache.save()

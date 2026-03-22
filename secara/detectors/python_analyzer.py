@@ -26,6 +26,7 @@ from typing import List, Union
 from secara.detectors.base import BaseDetector
 from secara.output.models import Finding
 from secara.taint.python_taint import PythonTaintTracker, _is_taint_source
+from secara.taint.interproc_taint import ModuleTaintGraph
 from secara.rules.rule_loader import get_rules_for_language
 
 logger = logging.getLogger("secara.python")
@@ -177,17 +178,21 @@ class PythonAnalyzer(BaseDetector):
 
         lines = content.splitlines()
 
+        # ── Build interprocedural taint graph for this module ─────────────
+        module_graph = ModuleTaintGraph(tree)
+        module_graph.build()
+
         # Walk all function definitions to enable per-function taint tracking
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                tracker = PythonTaintTracker()
+                tracker = PythonTaintTracker(module_graph=module_graph)
                 tracker.scan_function(node)
                 self._analyze_function(
                     file_path, node, tracker, lines, findings
                 )
 
         # Also check bare module-level calls (scripts, not just functions)
-        module_tracker = PythonTaintTracker()
+        module_tracker = PythonTaintTracker(module_graph=module_graph)
         self._analyze_body(file_path, ast.walk(tree), module_tracker, lines, findings)
 
         # De-duplicate (same file + line + rule)

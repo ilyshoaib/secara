@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Any, Dict, List
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 @dataclass
 class Rule:
@@ -12,3 +12,5 @@ class Rule:
     languages: List[str]
     pattern_type: str
     pattern: Dict[str, Any]
+    cwe: Optional[str] = None                    # e.g. "CWE-89"
+    references: List[str] = field(default_factory=list)  # URLs

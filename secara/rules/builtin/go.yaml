@@ -3,8 +3,12 @@ rules:
   - id: SQL005
     name: "SQL Injection via String Concatenation (Go)"
     severity: HIGH
-    description: "A database query is constructed dynamically using string formatting or concatenation. Use `db.Query('SELECT * FROM users WHERE id = ?', id)` parameterized queries."
-    fix: "Audit the input flowing into this function and apply safe usage patterns."
+    cwe: "CWE-89"
+    references:
+      - https://owasp.org/www-community/attacks/SQL_Injection
+      - https://cwe.mitre.org/data/definitions/89.html
+    description: "A database query is constructed dynamically using string formatting or concatenation. Use parameterized queries instead."
+    fix: "Use parameterized queries: db.Query('SELECT * FROM users WHERE id = ?', id)"
     languages: ["go"]
     pattern_type: "regex"
     pattern:
@@ -14,8 +18,12 @@ rules:
   - id: CMD005
     name: "Command Injection via exec.Command (Go)"
     severity: HIGH
-    description: "exec.Command is used with 'sh -c' and dynamic input. This allows arbitrary command execution. Avoid shells where possible and pass arguments as separate array elements."
-    fix: "Use exec.Command('ls', '-la', userDir) instead of executing sh/bash."
+    cwe: "CWE-78"
+    references:
+      - https://owasp.org/www-community/attacks/Command_Injection
+      - https://cwe.mitre.org/data/definitions/78.html
+    description: "exec.Command is used with 'sh -c' and dynamic input, allowing arbitrary command execution."
+    fix: "Use exec.Command('ls', '-la', userDir) instead of executing sh/bash with user-controlled arguments."
     languages: ["go"]
     pattern_type: "regex"
     pattern:
@@ -25,8 +33,12 @@ rules:
   - id: SSRF003
     name: "Server-Side Request Forgery / SSRF (Go)"
     severity: HIGH
-    description: "http.Get or similar method is called with a dynamically constructed URL. Validate user-provided URLs against an allowlist and block private IP address resolution."
-    fix: "Audit the input flowing into this function and apply safe usage patterns."
+    cwe: "CWE-918"
+    references:
+      - https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
+      - https://cwe.mitre.org/data/definitions/918.html
+    description: "http.Get or similar method is called with a dynamically constructed URL. Validate user-provided URLs against an allowlist."
+    fix: "Validate and allowlist URLs before making outbound HTTP requests."
     languages: ["go"]
     pattern_type: "regex"
     pattern:
@@ -36,8 +48,12 @@ rules:
   - id: PATH004
     name: "Path Traversal (Go)"
     severity: MEDIUM
-    description: "File operation with dynamically constructed path."
-    fix: "Audit the input flowing into this function and apply safe usage patterns."
+    cwe: "CWE-22"
+    references:
+      - https://owasp.org/www-community/attacks/Path_Traversal
+      - https://cwe.mitre.org/data/definitions/22.html
+    description: "File operation with a path variable derived from user-controlled request input."
+    fix: "Use filepath.Clean() and verify the result starts with a permitted base directory."
     languages: ["go"]
     pattern_type: "regex"
     pattern:

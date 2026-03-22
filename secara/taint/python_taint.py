@@ -121,10 +121,13 @@ class PythonTaintTracker:
     Walks a single Python AST node (typically a FunctionDef) and tracks
     tainted variable names. Provides methods to check if a given AST call
     node uses tainted arguments.
+
+    Optionally accepts a ModuleTaintGraph for interprocedural tracking.
     """
 
-    def __init__(self):
+    def __init__(self, module_graph=None):
         self._tainted_names: Set[str] = set()
+        self._module_graph = module_graph  # Optional[ModuleTaintGraph]
 
     def scan_function(self, func_node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         """
@@ -166,6 +169,17 @@ class PythonTaintTracker:
             return
 
         rhs_tainted = self._is_tainted_expr(value) or _is_taint_source(value)
+
+        # Interprocedural: if a function call returns tainted data, mark LHS
+        if not rhs_tainted and self._module_graph and isinstance(value, ast.Call):
+            func = value.func
+            func_name = None
+            if isinstance(func, ast.Name):
+                func_name = func.id
+            elif isinstance(func, ast.Attribute):
+                func_name = func.attr
+            if func_name and self._module_graph.does_return_tainted(func_name):
+                rhs_tainted = True
 
         if rhs_tainted:
             for t in targets:

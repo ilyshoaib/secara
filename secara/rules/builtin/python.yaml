@@ -3,6 +3,10 @@ rules:
   - id: SQL001
     name: "SQL Injection via String Formatting"
     severity: HIGH
+    cwe: "CWE-89"
+    references:
+      - https://owasp.org/www-community/attacks/SQL_Injection
+      - https://cwe.mitre.org/data/definitions/89.html
     description: "Detected execution of a dynamic SQL query constructed via string formatting or concatenation."
     fix: "Use parameterized queries (e.g., cursor.execute('SELECT * FROM users WHERE user=?', (username,))) instead of string formatting."
     languages: ["python"]
@@ -15,6 +19,10 @@ rules:
   - id: CMD001
     name: "Command Injection via os.system/popen"
     severity: HIGH
+    cwe: "CWE-78"
+    references:
+      - https://owasp.org/www-community/attacks/Command_Injection
+      - https://cwe.mitre.org/data/definitions/78.html
     description: "Detected dynamic string passed to os.system or os.popen."
     fix: "Avoid calling external processes with user input. If necessary, use subprocess.run with shell=False and pass arguments as a list."
     languages: ["python"]
@@ -28,6 +36,10 @@ rules:
   - id: CMD002
     name: "Command Injection via subprocess with shell=True"
     severity: HIGH
+    cwe: "CWE-78"
+    references:
+      - https://owasp.org/www-community/attacks/Command_Injection
+      - https://cwe.mitre.org/data/definitions/78.html
     description: "Detected dynamic command passed to subprocess with shell=True."
     fix: "Use subprocess.run with shell=False and pass arguments as a list (e.g., ['ls', '-l', user_dir])."
     languages: ["python"]
@@ -41,6 +53,9 @@ rules:
   - id: CMD003
     name: "Arbitrary Code Execution via eval/exec"
     severity: HIGH
+    cwe: "CWE-95"
+    references:
+      - https://cwe.mitre.org/data/definitions/95.html
     description: "Detected eval() or exec() used with non-literal source."
     fix: "Do not use eval() on untrusted data. Use ast.literal_eval() for safe parsing of data structures."
     languages: ["python"]
@@ -53,6 +68,10 @@ rules:
   - id: SSRF001
     name: "Server-Side Request Forgery (SSRF)"
     severity: HIGH
+    cwe: "CWE-918"
+    references:
+      - https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
+      - https://cwe.mitre.org/data/definitions/918.html
     description: "Detected outgoing HTTP request with a tainted, dynamic URL."
     fix: "Validate the URL against an allowlist of permitted IP addresses/hostnames before making the request."
     languages: ["python"]
@@ -66,6 +85,10 @@ rules:
   - id: DSER001
     name: "Insecure Deserialization via pickle.loads"
     severity: HIGH
+    cwe: "CWE-502"
+    references:
+      - https://owasp.org/www-project-top-ten/2017/A8_2017-Insecure_Deserialization
+      - https://cwe.mitre.org/data/definitions/502.html
     description: "Detected use of pickle.loads/load on untrusted data."
     fix: "Use a safe serialization format like JSON instead of pickle, or cryptographically sign the serialized data."
     languages: ["python"]
@@ -79,6 +102,10 @@ rules:
   - id: DSER004
     name: "Insecure YAML Deserialization"
     severity: HIGH
+    cwe: "CWE-502"
+    references:
+      - https://cwe.mitre.org/data/definitions/502.html
+      - https://pyyaml.org/wiki/PyYAMLDocumentation
     description: "Detected yaml.load() used without a SafeLoader."
     fix: "Use yaml.safe_load(data) instead of yaml.load(data)."
     languages: ["python"]
@@ -92,6 +119,9 @@ rules:
   - id: CRY001
     name: "Weak Cryptographic Hash algorithm"
     severity: HIGH
+    cwe: "CWE-327"
+    references:
+      - https://cwe.mitre.org/data/definitions/327.html
     description: "Detected the use of an obsolete and weak hash algorithm (MD5/SHA1)."
     fix: "Use strong hashing algorithms like SHA-256 for data integrity, or Argon2/Bcrypt for password hashing."
     languages: ["python"]
@@ -105,6 +135,9 @@ rules:
   - id: CRY002
     name: "SSL Certificate Verification Disabled"
     severity: HIGH
+    cwe: "CWE-295"
+    references:
+      - https://cwe.mitre.org/data/definitions/295.html
     description: "Detected an HTTP request with SSL verification explicitly set to False."
     fix: "Do not disable SSL verification in production environments (remove verify=False)."
     languages: ["python"]
@@ -116,6 +149,9 @@ rules:
   - id: CRY003
     name: "Insecure PRNG for Cryptographic Use"
     severity: MEDIUM
+    cwe: "CWE-338"
+    references:
+      - https://cwe.mitre.org/data/definitions/338.html
     description: "Detected random module functions which are not cryptographically secure."
     fix: "Use the secrets module (e.g., secrets.token_hex(32)) for generating security tokens."
     languages: ["python"]
@@ -129,6 +165,10 @@ rules:
   - id: PATH001
     name: "Path Traversal via open()"
     severity: HIGH
+    cwe: "CWE-22"
+    references:
+      - https://owasp.org/www-community/attacks/Path_Traversal
+      - https://cwe.mitre.org/data/definitions/22.html
     description: "Detected open() called with a tainted path variable."
     fix: "Sanitize the path by calling os.path.basename() or validating it against an allowed directory."
     languages: ["python"]
@@ -140,6 +180,10 @@ rules:
   - id: PATH002
     name: "Path Traversal via send_file()"
     severity: HIGH
+    cwe: "CWE-22"
+    references:
+      - https://owasp.org/www-community/attacks/Path_Traversal
+      - https://cwe.mitre.org/data/definitions/22.html
     description: "Detected Flask send_file() called with a tainted path variable."
     fix: "Avoid letting users define full file paths; map user input to internal IDs or use safe directory restrictions."
     languages: ["python"]
@@ -152,6 +196,9 @@ rules:
   - id: RACE001
     name: "TOCTOU Race Condition (Check-then-Open)"
     severity: MEDIUM
+    cwe: "CWE-367"
+    references:
+      - https://cwe.mitre.org/data/definitions/367.html
     description: "Detected a file check (os.path.exists/isfile) followed by an open() on the same path. This is a Time-of-Check to Time-of-Use race condition."
     fix: "Open the file directly and handle the OSError (FileNotFoundError/PermissionError) to ensure atomicity."
     languages: ["python"]
@@ -165,6 +212,9 @@ rules:
   - id: MASS001
     name: "Potential Mass Assignment (Model Injection)"
     severity: MEDIUM
+    cwe: "CWE-915"
+    references:
+      - https://cwe.mitre.org/data/definitions/915.html
     description: "Detected dynamic keyword arguments (**kwargs) passed to a model constructor or update method, which may allow attackers to modify protected fields."
     fix: "Explicitly list allowed fields or use a schema/DTO to validate input before updating the model."
     languages: ["python"]
@@ -177,6 +227,9 @@ rules:
   - id: TEMP001
     name: "Insecure Temporary File Creation"
     severity: MEDIUM
+    cwe: "CWE-377"
+    references:
+      - https://cwe.mitre.org/data/definitions/377.html
     description: "Detected use of insecure tempfile functions (mktemp) which are vulnerable to race conditions."
     fix: "Use tempfile.TemporaryFile() or tempfile.NamedTemporaryFile() which create files securely."
     languages: ["python"]
@@ -184,4 +237,3 @@ rules:
     pattern:
       category: "temp_file"
       functions: ["mktemp"]
-

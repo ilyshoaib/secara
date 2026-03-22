@@ -3,6 +3,10 @@ rules:
   - id: SQL101
     name: "SQL Injection via String Concatenation (JS/TS)"
     severity: HIGH
+    cwe: "CWE-89"
+    references:
+      - https://owasp.org/www-community/attacks/SQL_Injection
+      - https://cwe.mitre.org/data/definitions/89.html
     description: "Detected execution of a dynamic SQL query constructed via string concatenation or template literals."
     fix: "Use parameterized queries or prepared statements (e.g., db.query('SELECT * FROM users WHERE id = ?', [userId]))."
     languages: ["javascript", "typescript"]
@@ -14,7 +18,11 @@ rules:
   - id: CMD101
     name: "Command Injection via exec()"
     severity: HIGH
-    description: "Detected dynamic entry passed to child_process.exec(). This allow arbitrary command execution."
+    cwe: "CWE-78"
+    references:
+      - https://owasp.org/www-community/attacks/Command_Injection
+      - https://cwe.mitre.org/data/definitions/78.html
+    description: "Detected dynamic entry passed to child_process.exec(). This allows arbitrary command execution."
     fix: "Use execFile or spawn with argument arrays instead of shell-interpolated strings."
     languages: ["javascript", "typescript"]
     pattern_type: "regex"
@@ -24,6 +32,9 @@ rules:
   - id: CMD102
     name: "Command Injection via execSync()"
     severity: HIGH
+    cwe: "CWE-78"
+    references:
+      - https://cwe.mitre.org/data/definitions/78.html
     description: "Detected dynamic entry passed to child_process.execSync()."
     fix: "Avoid shell interpolation; pass sanitized arguments as a list."
     languages: ["javascript", "typescript"]
@@ -34,6 +45,9 @@ rules:
   - id: CMD103
     name: "Command Injection via spawn()"
     severity: HIGH
+    cwe: "CWE-78"
+    references:
+      - https://cwe.mitre.org/data/definitions/78.html
     description: "Detected dynamic command passed to child_process.spawn()."
     fix: "Ensure the command itself is not user-controlled. Pass arguments in the second parameter array."
     languages: ["javascript", "typescript"]
@@ -45,6 +59,9 @@ rules:
   - id: PRO101
     name: "Potential Prototype Pollution"
     severity: HIGH
+    cwe: "CWE-1321"
+    references:
+      - https://cwe.mitre.org/data/definitions/1321.html
     description: "Detected assignment to __proto__, constructor, or prototype which can lead to prototype pollution."
     fix: "Use Object.create(null) for objects that store user data, or use a library with pollution protection."
     languages: ["javascript", "typescript"]
@@ -56,6 +73,10 @@ rules:
   - id: XSS101
     name: "DOM-based XSS via innerHTML"
     severity: HIGH
+    cwe: "CWE-79"
+    references:
+      - https://owasp.org/www-community/attacks/xss/
+      - https://cwe.mitre.org/data/definitions/79.html
     description: "Detected assignment of potentially tainted data to .innerHTML, which can execute malicious scripts."
     fix: "Use .textContent or .innerText instead of .innerHTML, or use a DOM sanitizer library."
     languages: ["javascript", "typescript"]
@@ -66,6 +87,9 @@ rules:
   - id: XSS102
     name: "DOM-based XSS via document.write"
     severity: HIGH
+    cwe: "CWE-79"
+    references:
+      - https://cwe.mitre.org/data/definitions/79.html
     description: "Detected use of document.write with dynamic data."
     fix: "Avoid document.write; use DOM manipulation methods like document.createElement."
     languages: ["javascript", "typescript"]
@@ -77,6 +101,10 @@ rules:
   - id: SSRF101
     name: "Server-Side Request Forgery / SSRF (JS)"
     severity: HIGH
+    cwe: "CWE-918"
+    references:
+      - https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
+      - https://cwe.mitre.org/data/definitions/918.html
     description: "Detected HTTP request with a dynamically constructed URL."
     fix: "Validate URLs against an allowlist and prevent requests to private networking ranges."
     languages: ["javascript", "typescript"]
@@ -88,6 +116,9 @@ rules:
   - id: DSER101
     name: "Insecure Deserialization via node-serialize"
     severity: HIGH
+    cwe: "CWE-502"
+    references:
+      - https://cwe.mitre.org/data/definitions/502.html
     description: "Detected use of node-serialize or serialize-to-js which can execute embedded function expressions during deserialization."
     fix: "Use JSON.parse() and validate the schema with a library like Zod or Joi."
     languages: ["javascript", "typescript"]
@@ -98,6 +129,9 @@ rules:
   - id: DSER104
     name: "Insecure YAML Deserialization (js-yaml)"
     severity: HIGH
+    cwe: "CWE-502"
+    references:
+      - https://cwe.mitre.org/data/definitions/502.html
     description: "Detected yaml.load() call without SAFE_SCHEMA, which may allow execution of !!js/function tags."
     fix: "Use SAFE_SCHEMA: yaml.load(data, { schema: yaml.SAFE_SCHEMA })"
     languages: ["javascript", "typescript"]
@@ -109,6 +143,9 @@ rules:
   - id: CRY101
     name: "Weak Hash Algorithm"
     severity: HIGH
+    cwe: "CWE-327"
+    references:
+      - https://cwe.mitre.org/data/definitions/327.html
     description: "Detected use of MD5 or SHA1 hash algorithms which are cryptographically broken."
     fix: "Use SHA-256 or better for integrity; use Bcrypt/Argon2 for passwords."
     languages: ["javascript", "typescript"]
@@ -119,6 +156,9 @@ rules:
   - id: CRY102
     name: "Insecure Math.random() for Security"
     severity: MEDIUM
+    cwe: "CWE-338"
+    references:
+      - https://cwe.mitre.org/data/definitions/338.html
     description: "Math.random() is not cryptographically secure and should not be used for tokens or session IDs."
     fix: "Use crypto.randomBytes() or crypto.getRandomValues()."
     languages: ["javascript", "typescript"]
@@ -130,10 +170,13 @@ rules:
   - id: PATH101
     name: "Path Traversal via fs module"
     severity: HIGH
+    cwe: "CWE-22"
+    references:
+      - https://owasp.org/www-community/attacks/Path_Traversal
+      - https://cwe.mitre.org/data/definitions/22.html
     description: "Detected file system operation with user-controlled path variable."
     fix: "Sanitize paths using path.basename() or validate them against an allowlist."
     languages: ["javascript", "typescript"]
     pattern_type: "regex"
     pattern:
       regex: "(?ix)fs\\.(?:readFile|readSync|writeFile|writeSync|unlink|open|createReadStream|createWriteStream)\\s*\\(\\s*(?:[^)]*(?:req\\.|request\\.|params\\.|query\\.|body\\.|location\\.|ctx\\.|userInput|\\w+Input|\\w+Param|\\w+Data|\\w+Id))"
-
