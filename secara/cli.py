@@ -49,6 +49,7 @@ _JS_ANALYZER      = JSAnalyzer()
 _SHELL_ANALYZER   = ShellAnalyzer()
 _CONFIG_ANALYZER  = ConfigAnalyzer()
 _GO_ANALYZER      = GoAnalyzer()
+_DEP_SCANNER      = None  # Lazy-loaded on first use
 
 
 def _is_suppressed(line: str, rule_id: str) -> bool:
@@ -300,6 +301,92 @@ def scan_command(
 
 def main() -> None:
     cli()
+
+
+@cli.command("deps")
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--json", "use_json",
+    is_flag=True, default=False,
+    help="Output results as JSON.",
+)
+@click.option(
+    "--severity", "-s",
+    type=click.Choice(["CRITICAL", "HIGH", "MEDIUM", "LOW"], case_sensitive=False),
+    default="LOW",
+    show_default=True,
+    help="Minimum severity level to report.",
+)
+def deps_command(path: Path, use_json: bool, severity: str) -> None:
+    """
+    Scan dependency manifests for known CVEs using the OSV.dev database.
+
+    \b
+    Scans: requirements.txt, package.json, go.mod, Gemfile.lock
+    Example:
+      secara deps .
+      secara deps . --severity HIGH --json
+    """
+    from secara.sca.dependency_scanner import DependencyScanner
+    scanner = DependencyScanner()
+
+    # Find all supported dependency files
+    if path.is_file():
+        candidates = [path]
+    else:
+        candidates = []
+        for p in path.rglob("*"):
+            if scanner.is_dependency_file(p):
+                candidates.append(p)
+
+    if not candidates:
+        click.echo("No dependency files found (requirements.txt, package.json, go.mod, Gemfile.lock).")
+        sys.exit(0)
+
+    all_findings: List[Finding] = []
+    for dep_file in candidates:
+        try:
+            content = dep_file.read_text(encoding="utf-8", errors="replace")
+            findings = scanner.analyze(dep_file, content)
+            all_findings.extend(findings)
+        except OSError as e:
+            click.echo(f"Warning: Could not read {dep_file}: {e}", err=True)
+
+    filtered = filter_findings(all_findings, severity)
+
+    if use_json:
+        import json as _json
+        out = [{
+            "rule_id": f.rule_id,
+            "rule_name": f.rule_name,
+            "severity": f.severity,
+            "file": f.file_path,
+            "line": f.line_number,
+            "description": f.description,
+            "fix": f.fix,
+        } for f in filtered]
+        click.echo(_json.dumps(out, indent=2))
+    else:
+        try:
+            from rich.console import Console
+            from rich.table import Table
+            c = Console()
+            if not filtered:
+                c.print("[green]✓ No known vulnerabilities found in dependencies.[/green]")
+            else:
+                c.print(f"[bold red]Found {len(filtered)} vulnerable dependenc{'y' if len(filtered)==1 else 'ies'}:[/bold red]\n")
+                for f in filtered:
+                    sev_color = {"CRITICAL": "red", "HIGH": "red", "MEDIUM": "yellow", "LOW": "blue"}.get(f.severity, "white")
+                    c.print(f"  [{sev_color}][{f.severity}][/{sev_color}] {f.rule_name}")
+                    c.print(f"    [dim]{f.file_path}:{f.line_number}[/dim]")
+                    c.print(f"    {f.description}")
+                    c.print(f"    [green]Fix:[/green] {f.fix}")
+                    c.print()
+        except ImportError:
+            for f in filtered:
+                print(f"[{f.severity}] {f.rule_name}\n  {f.description}\n  Fix: {f.fix}\n")
+
+    sys.exit(1 if filtered else 0)
 
 
 if __name__ == "__main__":
