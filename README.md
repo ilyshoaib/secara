@@ -7,7 +7,7 @@
 **Fast. Accurate. Developer-Trusted.**
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 *Detect real, exploitable vulnerabilities — not style warnings.*
@@ -31,15 +31,17 @@ It runs fully **offline**, requires **no cloud APIs**, and is built to scale acr
 | 🔑 **Secrets Detection** | AWS keys, GitHub tokens, Stripe keys, private keys, high-entropy strings |
 | 💉 **SQL Injection** | AST-based detection of string concat / f-string SQL in Python and JS |
 | 🖥️ **Command Injection** | `os.system`, `subprocess` with `shell=True`, `exec()`, `eval()` |
-| 🐍 **Python (Tier 1)** | Full AST analysis + single-function taint tracking |
+| 🐍 **Python (Tier 1)** | Full AST analysis + Interprocedural Taint Tracking |
 | 🌐 **JavaScript / TypeScript (Tier 1)** | Regex-AST hybrid, no compiled dependencies |
+| ☕ **Java / Kotlin (Tier 2)** | Detects SQLi, XXE, Insecure Deserialization, SSRF |
+| 🐘 **PHP (Tier 2)** | Detects SQLi, LFI/RFI, XSS, Path Traversal |
+| 💎 **Ruby (Tier 2)** | Detects ActiveRecord SQLi, Mass Assignment, CMDi |
 | 🐹 **Go (Tier 2)** | Basic regex-based AST parsing (SQLi, CMDi, SSRF) |
+| 📦 **SCA Scanning** | Dependency vulnerability scanning via OSV.dev API |
 | 🐚 **Bash / Shell (Tier 2)** | Eval injection, unsafe substitution patterns |
 | ⚙️ **JSON / YAML / .env (Tier 2)** | Config file plaintext credential detection |
-| ⚡ **Parallel Scanning** | ThreadPoolExecutor for fast multi-file processing |
-| 💾 **Smart Cache** | SHA-256 file cache skips unchanged files |
-| 🎨 **Beautiful Output** | Rich terminal UI, JSON mode, severity filtering |
-| 🛠️ **CI/CD Ready** | Generate standard SARIF files for GitHub Actions Code Scanning |
+| 💧 **Inline Suppression** | Fine-grained suppression with `secara: ignore[RULE_ID]` |
+| 🎨 **Beautiful Output** | Rich terminal UI, JSON mode, SARIF export |
 
 ---
 
@@ -163,7 +165,7 @@ secara scan /large/repo --workers 16
 
 ---
 
-## 🛡️ Vulnerability Coverage (v0.2)
+## 🛡️ Vulnerability Coverage (v0.6.0)
 
 ### 🔑 Hardcoded Secrets (35+ patterns)
 
@@ -202,7 +204,9 @@ secara scan /large/repo --workers 16
 | Rule ID | Vulnerability | Languages | Severity |
 |---------|--------------|-----------|----------|
 | SQL001 | SQLi via String Concat / f-string | Python AST | HIGH |
-| SQL002 | SQLi via Concat / Template Literal | JavaScript | HIGH |
+| SQL201 | SQLi via Dynamic Statement | Java | HIGH |
+| SQL301 | SQLi via `mysql_query` | PHP | HIGH |
+| SQL401 | SQLi via String Interpolation in ActiveRecord | Ruby | HIGH |
 | SQL005 | SQLi via string construction in `db.Query` | Go | HIGH |
 
 ### 🖥️ Command Injection
@@ -210,15 +214,9 @@ secara scan /large/repo --workers 16
 | Rule ID | Vulnerability | Languages | Severity |
 |---------|--------------|-----------|----------|
 | CMD001 | `os.system()` with dynamic args | Python | HIGH |
-| CMD002 | `subprocess` with `shell=True` + dynamic cmd | Python | HIGH |
-| CMD003 | `eval()` / `exec()` with non-literal arg | Python | HIGH/MED |
-| CMD101 | `exec()` with dynamic arg | JavaScript | HIGH |
-| CMD102 | `execSync()` with dynamic arg | JavaScript | HIGH |
-| CMD103 | `spawn()` with dynamic first arg | JavaScript | HIGH |
-| CMD104 | `eval()` with non-literal arg | JavaScript | HIGH |
-| CMD105 | Prototype Pollution (direct `__proto__` access) | JavaScript | MEDIUM |
-| CMD107 | Prototype Pollution via `Object.assign(obj, req.body)` | JavaScript | HIGH |
-| CMD005 | `exec.Command` with dynamic strings and `sh -c` | Go | HIGH |
+| CMD201 | `Runtime.getRuntime().exec()` | Java | HIGH |
+| CMD301 | `exec()` / `shell_exec()` | PHP | HIGH |
+| CMD401 | `` `backticks` `` and `system()` | Ruby | HIGH |
 | SH001 | `eval` with variable in shell script | Bash | HIGH |
 | SH002 | Unsafe backtick substitution | Bash | HIGH |
 | SH004 | Dangerous command with unquoted variable | Bash | HIGH |
@@ -257,8 +255,9 @@ secara scan /large/repo --workers 16
 | Rule ID | Vulnerability | Languages | Severity |
 |---------|--------------|-----------|----------|
 | PATH001 | `open(user_input)` — directory traversal | Python | HIGH |
-| PATH002 | Flask `send_file(user_input)` | Python | HIGH |
-| PATH003 | `fs.readFile/writeFile` with dynamic path | JavaScript | HIGH |
+| PATH201 | `new File(user_input)` | Java | HIGH |
+| PATH301 | `file_get_contents($user_input)` | PHP | HIGH |
+| PATH401 | `File.read(user_input)` | Ruby | HIGH |
 | PATH004 | `os.Open` with dynamic path | Go | MEDIUM |
 
 ### 🎯 Injection — Extended [OWASP A03]
@@ -285,9 +284,18 @@ secara scan /large/repo --workers 16
 | Rule ID | Vulnerability | Languages | Severity |
 |---------|--------------|-----------|----------|
 | CFG001 | Plaintext secret value in `.env`/`.ini` file | Config | HIGH |
-| CFG002 | Plaintext secret in JSON config | JSON | HIGH |
-| CFG003 | Plaintext secret in YAML config | YAML | HIGH |
+| CFG201 | Spring Boot CSRF Disabled | Java | MEDIUM |
+| CFG301 | `display_errors` enabled in code | PHP | MEDIUM |
 | CFG010 | CORS wildcard `*` origin | JavaScript | MEDIUM |
+
+### 📦 Software Composition Analysis (SCA)
+
+| File | Scanner | Severity Mapping |
+| --- | --- | --- |
+| `requirements.txt` | Python Dependency Scan | OSV.dev (CVE/GHSA) |
+| `package.json` | JS Dependency Scan | OSV.dev (CVE/GHSA) |
+| `go.mod` | Go Dependency Scan | OSV.dev (CVE/GHSA) |
+| `Gemfile.lock` | Ruby Dependency Scan | OSV.dev (CVE/GHSA) |
 
 ---
 
@@ -295,29 +303,34 @@ secara scan /large/repo --workers 16
 
 ```
 secara/
-├── cli.py                    # CLI entry point (Click)
+├── cli.py                    # CLI entry point (deps/scan commands)
 ├── scanner/
 │   ├── file_scanner.py       # Recursive traversal + parallel execution
-│   ├── language_engine.py    # Maps files to analysis tier
-│   └── cache.py              # SHA-256 file cache (~/.secara/cache.json)
+│   ├── language_engine.py    # Maps files to analysis tier (Tier 1/2)
+│   └── cache.py              # SHA-256 file cache
 ├── detectors/
-│   ├── base.py               # Abstract detector interface
-│   ├── secrets_detector.py   # Regex + Shannon entropy (all files)
-│   ├── python_analyzer.py    # Python AST: SQLi, CMDi, eval/exec
-│   ├── js_analyzer.py        # JavaScript/TypeScript: regex-AST hybrid
-│   ├── shell_analyzer.py     # Bash: Tier 2 regex
-│   └── config_analyzer.py   # JSON/YAML/.env: config secrets
+│   ├── python_analyzer.py    # Python AST + Taint analysis
+│   ├── js_analyzer.py        # JavaScript/TypeScript hybrid
+│   ├── java_analyzer.py      # Java/Kotlin Tier 2
+│   ├── php_analyzer.py       # PHP Tier 2
+│   ├── ruby_analyzer.py      # Ruby Tier 2
+│   ├── secrets_detector.py   # Global secrets detection
+│   └── generic_analyzer.py   # Base class for YAML-based regex detectors
+├── sca/
+│   ├── osv_client.py         # OSV.dev API integration
+│   └── parsers.py            # Manifest parsers (requirements, package.json...)
 ├── taint/
-│   └── python_taint.py       # Single-function taint tracking for Python
+│   ├── interproc_taint.py    # Interprocedural Call Graph logic
+│   └── python_taint.py       # Intraprocedural taint (AST)
 └── output/
-    ├── models.py             # Finding dataclass
-    └── formatter.py         # Rich CLI + JSON output
+    ├── sarif_formatter.py    # SARIF v2.1.0 output
+    └── rich_formatter.py     # Pretty-print CLI output
 ```
 
 **Language Tiers:**
-- **Tier 1** (Deep Analysis): Python, JavaScript, TypeScript
-- **Tier 2** (Basic Detection): Bash, JSON, YAML
-- **Secrets-only**: `.env`, `.ini`, `.toml`, `.cfg`
+- **Tier 1 (AST-based)**: Python, JavaScript, TypeScript
+- **Tier 2 (Regex-hybrid)**: Java, Kotlin, PHP, Ruby, Go, Bash
+- **SCA**: requirements.txt, package.json, go.mod, Gemfile.lock
 
 ---
 
@@ -377,15 +390,17 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 ## 🗺️ Roadmap
 
 - [x] Go language support (Tier 2/Regex)
-- [ ] Ruby / PHP support (Tier 2)
+- [x] Java / Kotlin / Ruby / PHP support (Tier 2)
+- [x] Software Composition Analysis (SCA) - Dependency scanning
 - [x] SARIF output format (GitHub Code Scanning compatible)
 - [x] GitHub Actions workflow
 - [ ] VS Code extension
-- [ ] Interprocedural taint analysis
-- [ ] Custom rule authoring (YAML)
+- [x] Interprocedural taint analysis
+- [x] Custom rule authoring (YAML)
 - [x] Path traversal detection
 - [x] SSRF detection
 - [x] Insecure deserialization detection
+- [x] CWE Mapping for all rules
 
 ---
 
