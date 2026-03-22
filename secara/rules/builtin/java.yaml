@@ -1,0 +1,242 @@
+rules:
+  # ── SQL Injection ────────────────────────────────────────────────────────
+  - id: SQL201
+    name: "SQL Injection via Statement.execute() (Java)"
+    severity: HIGH
+    cwe: "CWE-89"
+    references:
+      - https://owasp.org/www-community/attacks/SQL_Injection
+      - https://cwe.mitre.org/data/definitions/89.html
+    description: >
+      Detected dynamic SQL query construction via string concatenation.
+      This allows an attacker to modify the SQL query and may lead to 
+      unauthorized data access, modification, or deletion.
+    fix: >
+      Use PreparedStatement with parameterized queries:
+      PreparedStatement ps = conn.prepareStatement("SELECT * FROM users WHERE id = ?");
+      ps.setString(1, userId);
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)\\.(?:execute(?:Query|Update)?|prepareStatement)\\s*\\(\\s*(?:[^)]*(?:\\+|String\\.format|String\\.valueOf|new\\s+StringBuilder)[^)]*)"
+
+  - id: SQL202
+    name: "SQL Injection via MyBatis / Hibernate raw query"
+    severity: HIGH
+    cwe: "CWE-89"
+    references:
+      - https://cwe.mitre.org/data/definitions/89.html
+    description: >
+      Detected use of ${ } (string substitution) inside a MyBatis/HQL query 
+      instead of #{ } (parameterized). This is the most common ORM injection vector in Java.
+    fix: >
+      Replace ${ } with #{ } in MyBatis SQL — MyBatis will then use a PreparedStatement
+      and properly parameterize the value:
+      SELECT * FROM users WHERE name = #{name}  (safe)
+      SELECT * FROM users WHERE name = '${name}'  (vulnerable)
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)[^\"']*\\$\\{[^}]+\\}"
+
+  # ── Command Injection ────────────────────────────────────────────────────
+  - id: CMD201
+    name: "Command Injection via Runtime.exec() (Java)"
+    severity: HIGH
+    cwe: "CWE-78"
+    references:
+      - https://owasp.org/www-community/attacks/Command_Injection
+      - https://cwe.mitre.org/data/definitions/78.html
+    description: >
+      Detected Runtime.getRuntime().exec() with a dynamically constructed command string.
+      This allows arbitrary OS command execution if user input influences the command.
+    fix: >
+      Pass arguments as an array instead of a shell string:
+      Runtime.getRuntime().exec(new String[]{"ls", "-l", userDir})
+      This prevents shell metacharacter injection.
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)Runtime\\.getRuntime\\s*\\(\\s*\\)\\.exec\\s*\\(\\s*(?:[^)]*?(?:\\+|new\\s+String|\\w+Cmd|\\w+Command|\\w+Input)[^)]*)"
+
+  - id: CMD202
+    name: "Command Injection via ProcessBuilder (Java)"
+    severity: HIGH
+    cwe: "CWE-78"
+    references:
+      - https://cwe.mitre.org/data/definitions/78.html
+    description: >
+      Detected ProcessBuilder constructed with dynamic string arguments.
+      If user input flows into the command arguments, arbitrary commands can be executed.
+    fix: >
+      Validate and sanitize each argument passed to ProcessBuilder.
+      Avoid using Arrays.asList(cmd) where cmd is built from user input.
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)new\\s+ProcessBuilder\\s*\\([^)]*(?:\\+|\\w+Input|\\w+Cmd|request\\.|req\\.|params\\.|\\w+Param)[^)]*\\)"
+
+  # ── XXE — XML External Entity ────────────────────────────────────────────
+  - id: XXE201
+    name: "XML External Entity (XXE) Injection"
+    severity: HIGH
+    cwe: "CWE-611"
+    references:
+      - https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
+      - https://cwe.mitre.org/data/definitions/611.html
+    description: >
+      Detected XML parsing using DocumentBuilderFactory or SAXParserFactory 
+      without disabling external entity processing. This can lead to XXE attacks
+      allowing file disclosure, SSRF, or denial of service.
+    fix: >
+      Disable external entities in your XML parser:
+      DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+      dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+      dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:DocumentBuilderFactory|SAXParserFactory|XMLInputFactory|TransformerFactory)\\.newInstance\\s*\\(\\s*\\)"
+
+  # ── Insecure Deserialization ─────────────────────────────────────────────
+  - id: DSER201
+    name: "Insecure Java Deserialization via ObjectInputStream"
+    severity: HIGH
+    cwe: "CWE-502"
+    references:
+      - https://owasp.org/www-project-top-ten/2017/A8_2017-Insecure_Deserialization
+      - https://cwe.mitre.org/data/definitions/502.html
+    description: >
+      Detected ObjectInputStream.readObject() which is the primary source of
+      Java deserialization vulnerabilities (used in log4shell, Apache Struts, etc.).
+      Deserializing untrusted data with this method can lead to Remote Code Execution.
+    fix: >
+      Use a deserialization filter (Java 9+):
+      ObjectInputFilter filter = info -> info.serialClass() != null && 
+        allowedClasses.contains(info.serialClass().getName()) ? ALLOWED : REJECTED;
+      ois.setObjectInputFilter(filter);
+      Or use a safer format like JSON/Protobuf/Avro for data interchange.
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)new\\s+ObjectInputStream|ObjectInputStream\\s*\\(|readObject\\s*\\(\\s*\\)"
+
+  # ── SSRF ─────────────────────────────────────────────────────────────────
+  - id: SSRF201
+    name: "Server-Side Request Forgery (SSRF) via URL (Java)"
+    severity: HIGH
+    cwe: "CWE-918"
+    references:
+      - https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
+      - https://cwe.mitre.org/data/definitions/918.html
+    description: >
+      Detected new URL(userInput).openConnection() or HttpURLConnection with
+      a dynamically constructed URL. This can allow SSRF attacks targeting 
+      internal services.
+    fix: >
+      Validate the user-supplied URL against an allowlist of permitted hosts
+      before making the request. Block requests to private IP ranges (10.x, 172.16.x, 192.168.x, 127.x).
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)new\\s+URL\\s*\\([^)]*(?:\\+|request\\.|req\\.|\\w+Input|\\w+Url|\\w+Param)[^)]*\\)\\.openConnection|HttpURLConnection|OkHttp|RestTemplate"
+
+  # ── Weak Cryptography ────────────────────────────────────────────────────
+  - id: CRY201
+    name: "Weak Cryptographic Algorithm (Java)"
+    severity: HIGH
+    cwe: "CWE-327"
+    references:
+      - https://cwe.mitre.org/data/definitions/327.html
+    description: >
+      Detected use of MD5 or SHA-1 algorithm which are cryptographically 
+      broken. These algorithms are vulnerable to collision attacks.
+    fix: >
+      Use SHA-256 or stronger for integrity checks:
+      MessageDigest.getInstance("SHA-256")
+      For passwords, use Java's PasswordEncoder implementations (BCrypt, Argon2).
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)MessageDigest\\.getInstance\\s*\\(\\s*[\"'](?:MD5|SHA-1|SHA1)[\"']"
+
+  - id: CRY202
+    name: "Insecure Random Number Generator (Java)"
+    severity: MEDIUM
+    cwe: "CWE-338"
+    references:
+      - https://cwe.mitre.org/data/definitions/338.html
+    description: >
+      Detected use of java.util.Random for security-sensitive values. 
+      java.util.Random is a predictable pseudo-random number generator and 
+      must not be used for security tokens, session IDs, or cryptographic keys.
+    fix: >
+      Replace java.util.Random with java.security.SecureRandom:
+      SecureRandom secureRandom = new SecureRandom();
+      byte[] token = new byte[32];
+      secureRandom.nextBytes(token);
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)new\\s+(?:java\\.util\\.)?Random\\s*\\(|new\\s+Random\\s*\\("
+
+  # ── Path Traversal ───────────────────────────────────────────────────────
+  - id: PATH201
+    name: "Path Traversal via File I/O (Java)"
+    severity: HIGH
+    cwe: "CWE-22"
+    references:
+      - https://owasp.org/www-community/attacks/Path_Traversal
+      - https://cwe.mitre.org/data/definitions/22.html
+    description: >
+      Detected file operation with input derived from request parameters.
+      An attacker can use path traversal sequences (../) to access files 
+      outside the intended directory.
+    fix: >
+      Canonicalize the path and verify it starts with the allowed base directory:
+      Path resolved = basePath.resolve(userInput).normalize();
+      if (!resolved.startsWith(basePath)) throw new SecurityException("Path traversal");
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)new\\s+(?:File|FileInputStream|FileOutputStream|FileReader|FileWriter)\\s*\\([^)]*(?:request\\.|req\\.|getParameter|getPathVariable|\\w+Input|\\w+Path|\\w+File)[^)]*\\)"
+
+  # ── Spring Security Headers ──────────────────────────────────────────────
+  - id: CONF201
+    name: "CSRF Protection Disabled (Spring)"
+    severity: HIGH
+    cwe: "CWE-352"
+    references:
+      - https://owasp.org/www-community/attacks/csrf
+      - https://cwe.mitre.org/data/definitions/352.html
+    description: >
+      Detected Spring Security configuration with CSRF protection explicitly disabled.
+      This makes all state-changing endpoints vulnerable to Cross-Site Request Forgery.
+    fix: >
+      Remove csrf().disable() from your Spring Security configuration.
+      If you are building a stateless REST API using JWTs, use SameSite=Strict cookies
+      or validate the Origin/Referer header instead.
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)\\.csrf\\s*\\(\\s*\\)\\.disable\\s*\\(\\s*\\)|csrf\\.disable"
+
+  # ── Log4Shell / Log Injection ────────────────────────────────────────────
+  - id: LOG201
+    name: "Log Injection (Java)"
+    severity: MEDIUM
+    cwe: "CWE-117"
+    references:
+      - https://cwe.mitre.org/data/definitions/117.html
+    description: >
+      Detected logging of user-controlled data without sanitization.
+      This can lead to log injection or log forging attacks where attackers
+      insert fake log entries to hide malicious activity.
+    fix: >
+      Sanitize user input before logging by removing newlines:
+      logger.info("User: {}", username.replaceAll("[\n\r]", "_"));
+      Or use a structured logging format that prevents injection.
+    languages: ["java", "kotlin"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:logger|log|LOG)\\.(?:debug|info|warn|error|trace)\\s*\\([^)]*(?:request\\.|req\\.|getParameter|\\w+Input|\\w+Data|\\w+Param)[^)]*\\)"

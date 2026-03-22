@@ -1,0 +1,215 @@
+rules:
+  # ── SQL Injection ────────────────────────────────────────────────────────
+  - id: SQL301
+    name: "SQL Injection via mysql_query / mysql_real_escape_string (PHP)"
+    severity: HIGH
+    cwe: "CWE-89"
+    references:
+      - https://owasp.org/www-community/attacks/SQL_Injection
+      - https://cwe.mitre.org/data/definitions/89.html
+    description: >
+      Detected legacy mysql_ functions being used with dynamic input.
+      The deprecated mysql_* extension is unsafe and has been removed from PHP 7+.
+      String concatenation into SQL allows SQL injection.
+    fix: >
+      Use PDO or MySQLi with prepared statements:
+      $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+      $stmt->execute([$id]);
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)mysql(?:i)?_query\\s*\\([^)]*(?:\\$_GET|\\$_POST|\\$_REQUEST|\\$_COOKIE|\\$_SERVER|\\$\\w+Input|\\$\\w+Param|\\$\\w+Data)"
+
+  - id: SQL302
+    name: "SQL Injection via PDO without prepared statements (PHP)"
+    severity: HIGH
+    cwe: "CWE-89"
+    references:
+      - https://cwe.mitre.org/data/definitions/89.html
+    description: >
+      Detected PDO::query() or PDO::exec() called with a dynamically constructed SQL string.
+      Even with PDO, directly interpolating variables into queries bypasses parameterization.
+    fix: >
+      Always use PDO::prepare() with bound parameters:
+      $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email");
+      $stmt->execute([':email' => $email]);
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)\\$(?:pdo|db|conn|connection)\\s*->\\s*(?:query|exec)\\s*\\([^)]*(?:\\$_GET|\\$_POST|\\$_REQUEST|\\$\\w+|\\.|\\+|sprintf|\"[^\"]*\\$)"
+
+  # ── Command Injection ────────────────────────────────────────────────────
+  - id: CMD301
+    name: "Command Injection via exec/system/passthru (PHP)"
+    severity: HIGH
+    cwe: "CWE-78"
+    references:
+      - https://owasp.org/www-community/attacks/Command_Injection
+      - https://cwe.mitre.org/data/definitions/78.html
+    description: >
+      Detected exec(), system(), shell_exec(), or passthru() called with 
+      dynamic user input. This allows arbitrary OS command execution.
+    fix: >
+      Avoid calling external programs with user input. If unavoidable, use
+      escapeshellarg() or escapeshellcmd() to sanitize input:
+      system('ls ' . escapeshellarg($userDir));
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:exec|system|shell_exec|passthru|popen)\\s*\\([^)]*(?:\\$_GET|\\$_POST|\\$_REQUEST|\\$_COOKIE|\\$\\w+Input|\\$\\w+Cmd|\\$\\w+Param)"
+
+  - id: CMD302
+    name: "Command Injection via backtick operator (PHP)"
+    severity: HIGH
+    cwe: "CWE-78"
+    references:
+      - https://cwe.mitre.org/data/definitions/78.html
+    description: >
+      Detected use of PHP backtick shell operator with variable interpolation.
+      This is equivalent to shell_exec() and allows command injection.
+    fix: >
+      Never use backtick operator with user-controlled input. Use proc_open() 
+      with proper argument escaping instead.
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)`[^`]*\\$(?:_GET|_POST|_REQUEST|_COOKIE|\\w+Input)[^`]*`"
+
+  # ── Remote/Local File Inclusion ──────────────────────────────────────────
+  - id: LFI301
+    name: "Local/Remote File Inclusion via include/require (PHP)"
+    severity: HIGH
+    cwe: "CWE-98"
+    references:
+      - https://owasp.org/www-project-web-security-testing-guide/
+      - https://cwe.mitre.org/data/definitions/98.html
+    description: >
+      Detected include(), require(), include_once(), or require_once() 
+      called with user-supplied input. This can allow an attacker to include
+      arbitrary local or remote files, leading to LFI or RFI.
+    fix: >
+      Use a whitelist-based approach for file inclusion:
+      $allowed = ['home', 'about', 'contact'];
+      if (in_array($page, $allowed)) { include $page . '.php'; }
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:include|require)(?:_once)?\\s*\\(?[^)]*(?:\\$_GET|\\$_POST|\\$_REQUEST|\\$_COOKIE|\\$\\w+Page|\\$\\w+File|\\$\\w+Path)"
+
+  # ── XSS ─────────────────────────────────────────────────────────────────
+  - id: XSS301
+    name: "Cross-Site Scripting (XSS) via echo/print (PHP)"
+    severity: HIGH
+    cwe: "CWE-79"
+    references:
+      - https://owasp.org/www-community/attacks/xss/
+      - https://cwe.mitre.org/data/definitions/79.html
+    description: >
+      Detected direct output of unescaped user input via echo or print.
+      This allows attackers to inject malicious HTML/JavaScript into the page.
+    fix: >
+      Always escape output using htmlspecialchars():
+      echo htmlspecialchars($_GET['name'], ENT_QUOTES, 'UTF-8');
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:echo|print)\\s+(?!htmlspecialchars|htmlentities|strip_tags)[^;]*(?:\\$_GET|\\$_POST|\\$_REQUEST|\\$_COOKIE|\\$_SERVER\\[.HTTP_)"
+
+  # ── Path Traversal ───────────────────────────────────────────────────────
+  - id: PATH301
+    name: "Path Traversal via file functions (PHP)"
+    severity: HIGH
+    cwe: "CWE-22"
+    references:
+      - https://owasp.org/www-community/attacks/Path_Traversal
+      - https://cwe.mitre.org/data/definitions/22.html
+    description: >
+      Detected file operation with user-controlled path input.
+      Attackers can use ../ sequences to read sensitive files outside the webroot.
+    fix: >
+      Use realpath() and verify the path starts with the expected base directory:
+      $realPath = realpath($basedir . '/' . $userInput);
+      if (strpos($realPath, $basedir) !== 0) die("Access denied");
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:file_get_contents|file_put_contents|fopen|readfile|unlink|rmdir|mkdir|copy|rename)\\s*\\([^)]*(?:\\$_GET|\\$_POST|\\$_REQUEST|\\$\\w+File|\\$\\w+Path)"
+
+  # ── SSRF ─────────────────────────────────────────────────────────────────
+  - id: SSRF301
+    name: "Server-Side Request Forgery (SSRF) via curl/file_get_contents (PHP)"
+    severity: HIGH
+    cwe: "CWE-918"
+    references:
+      - https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
+      - https://cwe.mitre.org/data/definitions/918.html
+    description: >
+      Detected outgoing HTTP request using a URL from user-controlled input.
+      This can allow SSRF attacks targeting internal services.
+    fix: >
+      Validate URLs against an allowlist of permitted hosts.
+      Block requests to private IP ranges (10.x, 172.16.x, 192.168.x, 127.x, localhost).
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:curl_setopt\\s*\\([^)]*CURLOPT_URL|file_get_contents)\\s*\\([^)]*(?:\\$_GET|\\$_POST|\\$_REQUEST|\\$_COOKIE|\\$\\w+Url|\\$\\w+Uri)"
+
+  # ── Insecure Deserialization ─────────────────────────────────────────────
+  - id: DSER301
+    name: "Insecure Deserialization via unserialize() (PHP)"
+    severity: HIGH
+    cwe: "CWE-502"
+    references:
+      - https://owasp.org/www-project-top-ten/2017/A8_2017-Insecure_Deserialization
+      - https://cwe.mitre.org/data/definitions/502.html
+    description: >
+      Detected PHP unserialize() called with user-controlled data.
+      This is one of the most dangerous PHP vulnerabilities — it can lead to 
+      Remote Code Execution via PHP Object Injection (POI) attacks.
+    fix: >
+      Never use unserialize() on untrusted data. Use JSON for serialization:
+      $data = json_decode($_POST['data']);
+      If you must deserialize, implement the __wakeup()/__unserialize() methods
+      carefully and use allowed_classes to restrict which classes can be created.
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)unserialize\\s*\\([^)]*(?:\\$_GET|\\$_POST|\\$_REQUEST|\\$_COOKIE|\\$\\w+Data|\\$\\w+Input)"
+
+  # ── Weak Cryptography ────────────────────────────────────────────────────
+  - id: CRY301
+    name: "Weak Hashing Algorithm for Passwords (PHP)"
+    severity: HIGH
+    cwe: "CWE-327"
+    references:
+      - https://cwe.mitre.org/data/definitions/327.html
+    description: >
+      Detected MD5 or SHA1 used for password hashing.
+      These algorithms are too fast for password storage and are vulnerable 
+      to brute-force and rainbow table attacks.
+    fix: >
+      Use PHP's built-in password_hash() function:
+      $hash = password_hash($password, PASSWORD_BCRYPT);
+      $valid = password_verify($password, $hash);
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:md5|sha1)\\s*\\(\\s*\\$(?:password|passwd|pwd|pass|secret)"
+
+  # ── Misconfiguration ─────────────────────────────────────────────────────
+  - id: CONF301
+    name: "PHP Error Display Enabled (Information Disclosure)"
+    severity: MEDIUM
+    cwe: "CWE-209"
+    references:
+      - https://cwe.mitre.org/data/definitions/209.html
+    description: >
+      Detected display_errors set to On or 1 in PHP configuration.
+      This exposes stack traces, file paths, and database details to attackers.
+    fix: >
+      Set display_errors = Off in php.ini for production environments.
+      Enable logging instead: error_log = /var/log/php_errors.log
+    languages: ["php"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:ini_set|php_ini)\\s*\\([^)]*[\"']display_errors[\"'][^)]*[\"'](?:1|On|on|true)[\"']|display_errors\\s*=\\s*(?:1|On)"

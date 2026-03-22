@@ -1,0 +1,189 @@
+rules:
+  # ── SQL Injection ────────────────────────────────────────────────────────
+  - id: SQL401
+    name: "SQL Injection via String Interpolation in ActiveRecord (Ruby)"
+    severity: HIGH
+    cwe: "CWE-89"
+    references:
+      - https://owasp.org/www-community/attacks/SQL_Injection
+      - https://cwe.mitre.org/data/definitions/89.html
+    description: >
+      Detected string interpolation inside a raw ActiveRecord query method.
+      This bypasses ActiveRecord's parameterization and allows SQL injection.
+    fix: >
+      Use placeholder syntax instead of string interpolation:
+      User.where("email = ?", email)
+      User.where(email: params[:email])
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)\\.(?:where|find_by_sql|execute|select)\\s*\\([\"'][^\"']*#\\{[^}]+\\}"
+
+  - id: SQL402
+    name: "SQL Injection via .order() with user input (Ruby)"
+    severity: HIGH
+    cwe: "CWE-89"
+    references:
+      - https://cwe.mitre.org/data/definitions/89.html
+    description: >
+      Detected string interpolation in .order() or .group() calls.
+      These ActiveRecord methods accept column names without parameterization.
+    fix: >
+      Validate the column name against an allowlist before using in .order():
+      allowed = %w[name email created_at]
+      User.order(col) if allowed.include?(col)
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)\\.(?:order|group|having|reorder)\\s*\\([^)]*params\\["
+
+  # ── Command Injection ────────────────────────────────────────────────────
+  - id: CMD401
+    name: "Command Injection via system()/exec()/backticks (Ruby)"
+    severity: HIGH
+    cwe: "CWE-78"
+    references:
+      - https://owasp.org/www-community/attacks/Command_Injection
+      - https://cwe.mitre.org/data/definitions/78.html
+    description: >
+      Detected Ruby system(), exec(), or backtick shell operator with dynamic
+      string interpolation. This allows arbitrary OS command execution.
+    fix: >
+      Use the array form of system() which bypasses shell:
+      system('ls', '-l', user_dir)
+      Or use Shellwords.escape() to sanitize.
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)(?:system|exec|spawn|IO\\.popen)\\s*\\([^)]*#\\{[^}]+\\}|`[^`]*#\\{[^}]+\\}`"
+
+  # ── Mass Assignment ──────────────────────────────────────────────────────
+  - id: MASS401
+    name: "Mass Assignment via unpermitted params (Ruby on Rails)"
+    severity: HIGH
+    cwe: "CWE-915"
+    references:
+      - https://guides.rubyonrails.org/security.html
+      - https://cwe.mitre.org/data/definitions/915.html
+    description: >
+      Detected Rails model creation/update with the raw params hash.
+      Without strong parameters, attackers can set sensitive fields.
+    fix: >
+      Always use strong parameters:
+      def user_params
+        params.require(:user).permit(:name, :email)
+      end
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)\\.(?:create|update|new|assign_attributes)\\s*\\(\\s*params\\s*[,)]"
+
+  # ── XSS ─────────────────────────────────────────────────────────────────
+  - id: XSS401
+    name: "XSS via html_safe / raw (Ruby on Rails)"
+    severity: HIGH
+    cwe: "CWE-79"
+    references:
+      - https://owasp.org/www-community/attacks/xss/
+      - https://cwe.mitre.org/data/definitions/79.html
+    description: >
+      Detected use of html_safe or raw() on user-controlled data.
+      These methods bypass Rails' automatic HTML escaping.
+    fix: >
+      Only call html_safe on trusted, literal strings you control.
+      Never call it on params, model attributes, or external data.
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)params(?:\\[:[^\\]]+\\])?\\.html_safe|raw\\s*\\(\\s*params"
+
+  # ── Path Traversal ───────────────────────────────────────────────────────
+  - id: PATH401
+    name: "Path Traversal via File.read/open (Ruby)"
+    severity: HIGH
+    cwe: "CWE-22"
+    references:
+      - https://owasp.org/www-community/attacks/Path_Traversal
+      - https://cwe.mitre.org/data/definitions/22.html
+    description: >
+      Detected file read or open with a path derived from user input.
+      Attackers can use ../ sequences to read arbitrary files.
+    fix: >
+      Canonicalize the path and validate it's under the expected directory:
+      path = File.expand_path(user_input, base_dir)
+      raise SecurityError unless path.start_with?(base_dir)
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)File\\.(?:read|open|write|delete)\\s*\\([^)]*params"
+
+  # ── SSRF ─────────────────────────────────────────────────────────────────
+  - id: SSRF401
+    name: "SSRF via Net::HTTP / open-uri (Ruby)"
+    severity: HIGH
+    cwe: "CWE-918"
+    references:
+      - https://owasp.org/www-community/attacks/Server_Side_Request_Forgery
+      - https://cwe.mitre.org/data/definitions/918.html
+    description: >
+      Detected HTTP request with a URL derived from user-controlled input.
+      This can allow SSRF attacks against internal services.
+    fix: >
+      Validate URLs against an allowlist before making requests.
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)Net::HTTP\\.get\\s*\\([^)]*params|URI\\.open\\s*\\([^)]*params|HTTParty\\.[a-z]+\\s*\\([^)]*params"
+
+  # ── Insecure Deserialization ─────────────────────────────────────────────
+  - id: DSER401
+    name: "Insecure Deserialization via Marshal.load (Ruby)"
+    severity: HIGH
+    cwe: "CWE-502"
+    references:
+      - https://cwe.mitre.org/data/definitions/502.html
+    description: >
+      Detected Marshal.load() called with user-controlled data.
+      Ruby's Marshal format can instantiate arbitrary objects, leading to RCE.
+    fix: >
+      Never use Marshal.load on untrusted data. Use JSON.parse() instead.
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)Marshal\\.(?:load|restore)\\s*\\([^)]*(?:params|request|body)"
+
+  # ── Weak Cryptography ────────────────────────────────────────────────────
+  - id: CRY401
+    name: "Weak Hash Algorithm for Passwords (Ruby)"
+    severity: HIGH
+    cwe: "CWE-327"
+    references:
+      - https://cwe.mitre.org/data/definitions/327.html
+    description: >
+      Detected use of MD5 or SHA1 for password hashing.
+      These algorithms are too fast and vulnerable to brute-force attacks.
+    fix: >
+      Use bcrypt for passwords:
+      BCrypt::Password.create(password, cost: 12)
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)Digest::(?:MD5|SHA1)\\.(?:hexdigest|digest)\\s*\\([^)]*(?:password|passwd|secret|token)"
+
+  # ── Dynamic Dispatch ─────────────────────────────────────────────────────
+  - id: DYN401
+    name: "Dynamic Method Dispatch via send() (Ruby)"
+    severity: HIGH
+    cwe: "CWE-470"
+    references:
+      - https://cwe.mitre.org/data/definitions/470.html
+    description: >
+      Detected Object.send() called with a method name from user input.
+      This allows attackers to invoke arbitrary methods including dangerous ones.
+    fix: >
+      Use an allowlist before calling send():
+      obj.send(method) if %w[to_json name].include?(method)
+    languages: ["ruby"]
+    pattern_type: "regex"
+    pattern:
+      regex: "(?ix)\\.send\\s*\\([^)]*params"

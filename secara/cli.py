@@ -24,6 +24,9 @@ from secara.detectors.js_analyzer import JSAnalyzer
 from secara.detectors.shell_analyzer import ShellAnalyzer
 from secara.detectors.config_analyzer import ConfigAnalyzer
 from secara.detectors.go_analyzer import GoAnalyzer
+from secara.detectors.java_analyzer import JavaAnalyzer
+from secara.detectors.php_analyzer import PHPAnalyzer
+from secara.detectors.ruby_analyzer import RubyAnalyzer
 from secara.output.models import Finding
 from secara.output.formatter import render_findings, filter_findings
 from secara.config import load_config
@@ -49,6 +52,9 @@ _JS_ANALYZER      = JSAnalyzer()
 _SHELL_ANALYZER   = ShellAnalyzer()
 _CONFIG_ANALYZER  = ConfigAnalyzer()
 _GO_ANALYZER      = GoAnalyzer()
+_JAVA_ANALYZER    = JavaAnalyzer()
+_PHP_ANALYZER     = PHPAnalyzer()
+_RUBY_ANALYZER    = RubyAnalyzer()
 _DEP_SCANNER      = None  # Lazy-loaded on first use
 
 
@@ -115,6 +121,12 @@ def _analyze_file(file_path: Path, cache: "FileCache", cfg=None) -> List[Finding
             findings.extend(_CONFIG_ANALYZER.analyze(file_path, content))
         elif language == "go":
             findings.extend(_GO_ANALYZER.analyze(file_path, content))
+        elif language in {"java", "kotlin"}:
+            findings.extend(_JAVA_ANALYZER.analyze(file_path, content))
+        elif language == "php":
+            findings.extend(_PHP_ANALYZER.analyze(file_path, content))
+        elif language == "ruby":
+            findings.extend(_RUBY_ANALYZER.analyze(file_path, content))
 
     # ── Secrets-only tier ─────────────────────────────────────────────────
     elif tier == LanguageTier.SECRETS_ONLY:

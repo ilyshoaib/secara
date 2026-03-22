@@ -24,15 +24,35 @@ EXTENSION_MAP: dict[str, tuple[str, str]] = {
     ".mjs":  (LanguageTier.TIER1, "javascript"),
     ".cjs":  (LanguageTier.TIER1, "javascript"),
 
-    # Tier 2
+    # Tier 2 — Shell
     ".sh":   (LanguageTier.TIER2, "bash"),
     ".bash": (LanguageTier.TIER2, "bash"),
     ".zsh":  (LanguageTier.TIER2, "bash"),
 
+    # Tier 2 — Config / Data
     ".json": (LanguageTier.TIER2, "json"),
     ".yaml": (LanguageTier.TIER2, "yaml"),
     ".yml":  (LanguageTier.TIER2, "yaml"),
+
+    # Tier 2 — Go
     ".go":   (LanguageTier.TIER2, "go"),
+
+    # Tier 2 — Java / Kotlin
+    ".java": (LanguageTier.TIER2, "java"),
+    ".kt":   (LanguageTier.TIER2, "kotlin"),
+    ".kts":  (LanguageTier.TIER2, "kotlin"),
+
+    # Tier 2 — PHP
+    ".php":  (LanguageTier.TIER2, "php"),
+    ".phtml": (LanguageTier.TIER2, "php"),
+    ".php3": (LanguageTier.TIER2, "php"),
+    ".php4": (LanguageTier.TIER2, "php"),
+    ".php5": (LanguageTier.TIER2, "php"),
+
+    # Tier 2 — Ruby
+    ".rb":   (LanguageTier.TIER2, "ruby"),
+    ".erb":  (LanguageTier.TIER2, "ruby"),
+    ".rake": (LanguageTier.TIER2, "ruby"),
 
     # Config / Secrets-only
     ".env":  (LanguageTier.SECRETS_ONLY, "env"),
