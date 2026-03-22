@@ -33,7 +33,10 @@ class JSAnalyzer(BaseDetector):
                 pattern_str = rule.pattern.get("regex", "")
                 if pattern_str:
                     try:
-                        compiled = re.compile(pattern_str, re.MULTILINE | re.DOTALL)
+                        clean = pattern_str
+                        for flag_group in ("(?ix)", "(?xi)", "(?x)", "(?i)"):
+                            clean = clean.replace(flag_group, "")
+                        compiled = re.compile(clean.strip(), re.IGNORECASE | re.MULTILINE)
                         self.compiled_rules.append((compiled, rule))
                     except re.error as e:
                         logger.error("Failed to compile JS rule %s: %s", rule.id, e)

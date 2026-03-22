@@ -20,7 +20,10 @@ class GoAnalyzer(BaseDetector):
             if rule.pattern_type == "regex":
                 pattern_str = rule.pattern.get("regex", "")
                 if pattern_str:
-                    compiled = re.compile(pattern_str, re.MULTILINE | re.DOTALL)
+                    clean = pattern_str
+                    for flag_group in ("(?ix)", "(?xi)", "(?x)", "(?i)"):
+                        clean = clean.replace(flag_group, "")
+                    compiled = re.compile(clean.strip(), re.IGNORECASE | re.MULTILINE)
                     self.compiled_rules.append((compiled, rule))
 
     def analyze(self, file_path: Path, content: str) -> list[Finding]:
