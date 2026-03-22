@@ -34,7 +34,16 @@ class GenericRegexAnalyzer(BaseDetector):
                 pattern_str = rule.pattern.get("regex", "")
                 if pattern_str:
                     try:
-                        compiled = re.compile(pattern_str, re.MULTILINE | re.DOTALL)
+                        # Strip inline (?x) / (?ix) from pattern to avoid
+                        # treating '#' as a regex comment (verbose mode).
+                        # We handle case-insensitivity via re.IGNORECASE instead.
+                        clean = pattern_str
+                        for flag_group in ("(?ix)", "(?xi)", "(?x)", "(?i)"):
+                            clean = clean.replace(flag_group, "")
+                        compiled = re.compile(
+                            clean.strip(),
+                            re.IGNORECASE | re.MULTILINE,
+                        )
                         self.compiled_rules.append((compiled, rule))
                     except re.error as e:
                         logger.error(
