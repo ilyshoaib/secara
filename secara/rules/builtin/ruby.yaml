@@ -17,7 +17,7 @@ rules:
     languages: ["ruby"]
     pattern_type: "regex"
     pattern:
-      regex: "(?ix)\\.(?:where|find_by_sql|execute|select)\\s*\\([\"'][^\"']*#\\{[^}]+\\}"
+      regex: "\\.(?:where|find_by_sql|execute|select)\\s*\\([\"'].*?#\\{[^}]+\\}"
 
   - id: SQL402
     name: "SQL Injection via .order() with user input (Ruby)"
