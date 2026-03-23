@@ -91,7 +91,7 @@ It is highly recommended to add tests before or during rule creation. Here is th
 
 We use `pytest` for all unit testing. Before submitting a Pull Request, ensure all tests pass.
 
-To run the full test suite:
+To run a full test suite:
 ```bash
 python -m pytest tests/ -v
 ```
