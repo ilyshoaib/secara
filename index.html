@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secara | Static Code Security Scanner</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <meta name="description" content="Secara: Fast, Offline, and Developer-Trusted Static Code Security Scanner for multiple languages..">
+    <link rel="icon" type="image/png" href="logo.png">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <img src="logo.png" alt="Secara Logo" class="logo-img">
+                <span class="logo-text">SECARA</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#languages">Languages</a></li>
+                <li><a href="#install">Install</a></li>
+                <li><a href="https://github.com/ilyshoaib/secara" class="btn-github">GitHub</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero container">
+            <div class="hero-content">
+                <span class="badge">v0.6.0 Available Now</span>
+                <h1>Detect Real Vulnerabilities, <span class="gradient-text">Zero False Alarms.</span></h1>
+                <p>Secara is a high-performance, offline static code scanner designed to find exploitable security flaws in your codebase before they hit production.</p>
+                <div class="hero-actions">
+                    <div class="copy-command">
+                        <code>pip install -e .</code>
+                        <button id="copy-btn">Copy</button>
+                    </div>
+                    <a href="#install" class="btn-primary">Quick Start</a>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="code-terminal">
+                    <div class="terminal-header">
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
+                    <div class="terminal-body" id="terminal-content">
+                        <span class="line">$ secara scan .</span>
+                        <span class="line">🔍 Scanning 450 files...</span>
+                        <span class="line-finding">[HIGH] SQL Injection found in app.py:45</span>
+                        <span class="line-finding">[MEDIUM] Hardcoded API Key in config.py:12</span>
+                        <span class="line">✅ Scan complete: 2 findings.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="features" class="features container">
+            <h2 class="section-title">Why use Secara?</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="card-icon">🔐</div>
+                    <h3>Secrets Detection</h3>
+                    <p>Detect 35+ patterns including AWS keys, GitHub tokens, and private keys.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="card-icon">💉</div>
+                    <h3>AST-Based Analysis</h3>
+                    <p>Hybrid of AST analysis and taint tracking for high accuracy and low noise.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="card-icon">⚡</div>
+                    <h3>Blazing Fast</h3>
+                    <p>Scan 1,000 files in seconds. Parallelized architecture fits any CI/CD.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="card-icon">🌍</div>
+                    <h3>Runs Fully Offline</h3>
+                    <p>No cloud APIs, no data telemetry. Your code stays on your machine.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="languages" class="languages container">
+            <h2 class="section-title">Multilingual Support</h2>
+            <div class="language-stats">
+                <div class="lang-item">
+                    <strong>Tier 1 (AST)</strong>
+                    <span>Python, JavaScript, TypeScript</span>
+                </div>
+                <div class="lang-item">
+                    <strong>Tier 2 (Regex-Hybrid)</strong>
+                    <span>Java, Kotlin, PHP, Ruby, Go, Bash</span>
+                </div>
+            </div>
+        </section>
+
+        <section id="install" class="install-section">
+            <div class="container">
+                <h2 class="section-title">Get Started in Seconds</h2>
+                <div class="install-box">
+                    <h3>One-line install</h3>
+                    <div class="code-block">
+                        <pre>git clone https://github.com/ilyshoaib/secara.git && cd secara && bash install.sh</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="container">
+        <p>&copy; 2026 Secara Project. Distributed under GNU GPLv3.</p>
+        <div class="social-links">
+            <a href="https://github.com/ilyshoaib/secara">GitHub</a>
+            <a href="https://secara.eu.cc">Website</a>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
