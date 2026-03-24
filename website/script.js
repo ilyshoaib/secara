@@ -18,15 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const terminal = document.getElementById('terminal-content');
     const lines = terminal.querySelectorAll('span');
     
-    // Hide all lines initially
-    lines.forEach(l => l.style.opacity = '0');
-
-    let delay = 500;
+    let delay = 800;
     lines.forEach((line, index) => {
         setTimeout(() => {
-            line.style.opacity = '1';
-            line.style.transition = 'opacity 0.5s ease-in-out';
+            line.classList.add('visible');
         }, delay);
-        delay += (index === 0) ? 1000 : 600;
+        delay += (index === 0) ? 1200 : 700;
     });
 });
