@@ -96,6 +96,8 @@ nav {
     }
     header {
         height: 60px;
+        backdrop-filter: none; /* Disable expensive blur on slow mobile GPUs */
+        background: rgba(10, 10, 12, 0.95);
     }
     .logo-img {
         height: 32px;
@@ -139,9 +141,10 @@ nav {
     width: 300px;
     height: 300px;
     background: var(--accent-glow);
-    filter: blur(100px);
+    filter: blur(80px); /* Reduced blur for performance */
     z-index: -1;
     border-radius: 50%;
+    will-change: filter;
 }
 
 .badge {
@@ -278,7 +281,8 @@ h1 {
     margin-bottom: 0.5rem;
     opacity: 0;
     transform: translateY(10px);
-    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    transition: opacity 0.4s ease-out, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    will-change: opacity, transform;
 }
 
 .terminal-body span.visible {
