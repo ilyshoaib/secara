@@ -386,13 +386,38 @@ footer {
     .hero {
         grid-template-columns: 1fr;
         text-align: center;
-        padding-top: 4rem;
+        padding: 4rem 1rem;
     }
     .hero-content {
         display: flex;
         flex-direction: column;
         align-items: center;
     }
-    h1 { font-size: 3rem; }
+    h1 { font-size: 2.8rem; }
     .hero-visual { display: none; }
+    
+    .hero-actions {
+        flex-direction: column;
+        width: 100%;
+        max-width: 400px;
+    }
+    
+    .copy-command, .btn-primary {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    h1 { font-size: 2.2rem; }
+    .copy-command {
+        gap: 0.5rem;
+        font-size: 0.8rem;
+    }
+    #copy-btn {
+        padding: 0.5rem 1rem; /* Larger touch target */
+    }
+    .btn-primary {
+        padding: 1rem 2rem; /* Larger touch target */
+    }
 }
