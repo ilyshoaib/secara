@@ -24,15 +24,15 @@ from __future__ import annotations
 
 import ast
 import logging
-from typing import Set
+from typing import Dict, Set
 
+from secara.taint.signatures import (
+    PY_SANITIZERS,
+    PY_SOURCE_ATTRS,
+    PY_SOURCE_CALL_ATTRS,
+    PY_TAINTED_PARAM_NAMES,
+)
 logger = logging.getLogger("secara.taint")
-
-# Known sanitizers that neutralize direct injection primitives.
-_SANITIZER_FUNCS = {
-    "int", "float", "bool",
-    "quote", "quote_plus", "escape", "literal_eval",
-}
 
 # ── Source detector helpers ───────────────────────────────────────────────────
 
@@ -53,9 +53,7 @@ def _is_taint_source(node: ast.expr) -> bool:
             }:
                 return True
         # request.get_json / request.args.get / etc.
-        if isinstance(func, ast.Attribute) and func.attr in {
-            "get", "get_json", "get_argument", "get_data"
-        }:
+        if isinstance(func, ast.Attribute) and func.attr in PY_SOURCE_CALL_ATTRS:
             return True
 
     # sys.argv[*]
@@ -65,10 +63,7 @@ def _is_taint_source(node: ast.expr) -> bool:
             return True
 
     # request.form, request.args, request.json, request.data
-    if isinstance(node, ast.Attribute) and node.attr in {
-        "form", "args", "json", "data", "body", "values",
-        "POST", "GET", "FILES"
-    }:
+    if isinstance(node, ast.Attribute) and node.attr in PY_SOURCE_ATTRS:
         return True
 
     # event["key"] / event.get(...)
@@ -94,9 +89,9 @@ def _attr_chain(node: ast.Attribute) -> str:
 
 def _is_sanitized_call(node: ast.Call) -> bool:
     if isinstance(node.func, ast.Name):
-        return node.func.id in _SANITIZER_FUNCS
+        return node.func.id in PY_SANITIZERS
     if isinstance(node.func, ast.Attribute):
-        return node.func.attr in _SANITIZER_FUNCS
+        return node.func.attr in PY_SANITIZERS
     return False
 
 
@@ -141,6 +136,7 @@ class PythonTaintTracker:
 
     def __init__(self, module_graph=None):
         self._tainted_names: Set[str] = set()
+        self._taint_sources: Dict[str, Set[str]] = {}
         self._module_graph = module_graph  # Optional[ModuleTaintGraph]
 
     def scan_function(self, func_node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
@@ -151,9 +147,8 @@ class PythonTaintTracker:
         """
         # Mark function args as tainted if named suggestively
         for arg in func_node.args.args:
-            if arg.arg in {"request", "req", "event", "context", "environ",
-                            "params", "data", "payload"}:
-                self._tainted_names.add(arg.arg)
+            if arg.arg in PY_TAINTED_PARAM_NAMES:
+                self._mark_tainted(arg.arg, {f"param:{arg.arg}"})
 
         for node in ast.walk(func_node):
             if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
@@ -162,7 +157,7 @@ class PythonTaintTracker:
                 if isinstance(node.target, ast.Name):
                     # for x in request.args  → x is tainted
                     if _is_taint_source(node.iter):
-                        self._tainted_names.add(node.target.id)
+                        self._mark_tainted(node.target.id, {"loop:tainted_iter"})
 
     def _handle_assignment(
         self, node: ast.Assign | ast.AnnAssign | ast.AugAssign
@@ -198,7 +193,7 @@ class PythonTaintTracker:
         if rhs_tainted:
             for t in targets:
                 if isinstance(t, ast.Name):
-                    self._tainted_names.add(t.id)
+                    self._mark_tainted(t.id, self._sources_from_expr(value))
 
     def _is_tainted_expr(self, node: ast.AST) -> bool:
         """Return True if *node* contains a reference to a tainted variable."""
@@ -229,6 +224,39 @@ class PythonTaintTracker:
                 return True
         return False
 
+    def _sources_from_expr(self, node: ast.AST) -> Set[str]:
+        """Best-effort source labels for taint provenance."""
+        sources: Set[str] = set()
+        if _is_taint_source(node):
+            sources.add(self._describe_source_node(node))
+        for n in ast.walk(node):
+            if isinstance(n, ast.Name) and n.id in self._tainted_names:
+                sources.update(self._taint_sources.get(n.id, {f"var:{n.id}"}))
+            elif isinstance(n, ast.Call) and _is_taint_source(n):
+                sources.add(self._describe_source_node(n))
+            elif isinstance(n, ast.Attribute) and _is_taint_source(n):
+                sources.add(self._describe_source_node(n))
+            elif isinstance(n, ast.Subscript) and _is_taint_source(n):
+                sources.add(self._describe_source_node(n))
+        return sources or {"unknown_source"}
+
+    @staticmethod
+    def _describe_source_node(node: ast.AST) -> str:
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                return f"call:{node.func.id}"
+            if isinstance(node.func, ast.Attribute):
+                return f"call:{_attr_chain(node.func)}"
+        if isinstance(node, ast.Attribute):
+            return f"attr:{node.attr}"
+        if isinstance(node, ast.Subscript):
+            return "subscript:taint_source"
+        return "source:unknown"
+
+    def _mark_tainted(self, name: str, sources: Set[str]) -> None:
+        self._tainted_names.add(name)
+        self._taint_sources.setdefault(name, set()).update(sources)
+
     def is_arg_tainted(self, call_node: ast.Call) -> bool:
         """Return True if any argument to *call_node* is tainted."""
         for arg in call_node.args:
@@ -242,3 +270,13 @@ class PythonTaintTracker:
     @property
     def tainted_names(self) -> Set[str]:
         return frozenset(self._tainted_names)
+
+    def explain_taint_for_expr(self, node: ast.AST) -> list[str]:
+        """Return source labels for tainted data referenced by *node*."""
+        labels: Set[str] = set()
+        for n in ast.walk(node):
+            if isinstance(n, ast.Name) and n.id in self._tainted_names:
+                labels.update(self._taint_sources.get(n.id, {f"var:{n.id}"}))
+            elif isinstance(n, ast.Call) and _is_taint_source(n):
+                labels.add(self._describe_source_node(n))
+        return sorted(labels)

@@ -4,7 +4,7 @@ Data models for scan findings.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
-from typing import Optional
+from typing import Any, Optional
 
 
 SEVERITY_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
@@ -25,6 +25,7 @@ class Finding:
     fix: str               # Actionable fix suggestion
     language: str = ""
     confidence: str = "HIGH"  # HIGH | MEDIUM | LOW
+    evidence: dict[str, Any] | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)

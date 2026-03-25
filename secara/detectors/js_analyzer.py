@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List
 
 from secara.detectors.base import BaseDetector
+from secara.detectors.js_signatures import JS_SANITIZER_FRAGMENTS, JS_SOURCE_FRAGMENTS
 from secara.output.models import Finding
 from secara.rules.rule_loader import get_rules_for_language
 
@@ -16,19 +17,7 @@ logger = logging.getLogger("secara.js")
 
 
 _SOURCE_PATTERN = re.compile(
-    r"""(?ix)
-    \b(
-      req\.[A-Za-z0-9_]+|
-      request\.[A-Za-z0-9_]+|
-      params\.[A-Za-z0-9_]+|
-      query\.[A-Za-z0-9_]+|
-      body\.[A-Za-z0-9_]+|
-      location\.[A-Za-z0-9_]+|
-      document\.URL|
-      userInput|
-      getParam\s*\(
-    )\b
-    """
+    r"(?ix)\b(" + "|".join(JS_SOURCE_FRAGMENTS) + r")\b"
 )
 
 _IDENT_PATTERN = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
@@ -39,14 +28,7 @@ _ASSIGN_PATTERN = re.compile(
     """
 )
 _SANITIZER_PATTERN = re.compile(
-    r"""(?ix)
-    \b(
-      encodeURIComponent|
-      DOMPurify\.sanitize|
-      sanitizeHtml|
-      escapeHtml
-    )\s*\(
-    """
+    r"(?ix)\b(" + "|".join(JS_SANITIZER_FRAGMENTS) + r")\s*\("
 )
 
 # Rules where we enforce tainted-flow evidence to reduce regex-only noise.

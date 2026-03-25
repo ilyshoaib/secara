@@ -360,6 +360,11 @@ class PythonAnalyzer(BaseDetector):
             description=rule.description,
             fix=rule.fix,
             language="python",
+            evidence=self._build_taint_evidence(
+                tracker=tracker,
+                expr=first_arg,
+                sink=f"{func.attr}()",
+            ),
         )
 
     def _arg_contains_tainted_name(
@@ -369,6 +374,19 @@ class PythonAnalyzer(BaseDetector):
             if isinstance(n, ast.Name) and n.id in tainted:
                 return True
         return False
+
+    def _build_taint_evidence(
+        self,
+        tracker: PythonTaintTracker,
+        expr: ast.AST,
+        sink: str,
+    ) -> dict:
+        sources = tracker.explain_taint_for_expr(expr)
+        return {
+            "sink": sink,
+            "taint_sources": sources,
+            "taint_path": " -> ".join([*(sources or ["unknown_source"]), sink]),
+        }
 
     # ── Command Injection ─────────────────────────────────────────────────────
     def _check_cmd_injection(
@@ -404,6 +422,11 @@ class PythonAnalyzer(BaseDetector):
                         description=rule.description,
                         fix=rule.fix,
                         language="python",
+                        evidence=self._build_taint_evidence(
+                            tracker=tracker,
+                            expr=arg0,
+                            sink=f"os.{func.attr}()",
+                        ),
                     )
 
         # ── subprocess.call / run / Popen with shell=True ─────────────────
@@ -437,6 +460,11 @@ class PythonAnalyzer(BaseDetector):
                                 "If shell=True is required, validate/sanitize input with shlex.quote()."
                             ),
                             language="python",
+                            evidence=self._build_taint_evidence(
+                                tracker=tracker,
+                                expr=arg0,
+                                sink=f"subprocess.{func.attr}(..., shell=True)",
+                            ),
                         )
 
         return None
@@ -735,6 +763,11 @@ class PythonAnalyzer(BaseDetector):
                             "  if urlparse(url).hostname not in ALLOWED_HOSTS: raise ValueError()"
                         ),
                         language="python",
+                        evidence=self._build_taint_evidence(
+                            tracker=tracker,
+                            expr=url_arg,
+                            sink=f"requests.{chain[-1]}()",
+                        ),
                     )
 
         # urllib.request.urlopen(url) where url is dynamic + tainted
@@ -764,6 +797,11 @@ class PythonAnalyzer(BaseDetector):
                             "Block private/loopback IP ranges and HTTPS-only enforcement."
                         ),
                         language="python",
+                        evidence=self._build_taint_evidence(
+                            tracker=tracker,
+                            expr=url_arg,
+                            sink=f"urllib.request.{chain[-1]}()",
+                        ),
                     )
 
         return None
@@ -895,6 +933,11 @@ class PythonAnalyzer(BaseDetector):
                             "  open(safe_path)"
                         ),
                         language="python",
+                        evidence=self._build_taint_evidence(
+                            tracker=tracker,
+                            expr=path_arg,
+                            sink="open()",
+                        ),
                     )
 
         # Flask send_file(user_input)
@@ -921,6 +964,11 @@ class PythonAnalyzer(BaseDetector):
                             "  flask.send_from_directory('/safe/upload/dir', filename)"
                         ),
                         language="python",
+                        evidence=self._build_taint_evidence(
+                            tracker=tracker,
+                            expr=path_arg,
+                            sink="send_file()",
+                        ),
                     )
 
         return None

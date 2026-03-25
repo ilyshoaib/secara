@@ -25,6 +25,19 @@ def get_user(request):
         "Should detect SQLi via string concatenation"
 
 
+def test_sqli_finding_includes_taint_evidence():
+    code = """
+def get_user(request, cursor):
+    user_id = request.args.get("id")
+    cursor.execute("SELECT * FROM users WHERE id = '" + user_id + "'")
+"""
+    findings = analyze(code)
+    sqli = [f for f in findings if f.rule_id == "SQL001"]
+    assert sqli, "Expected SQL001 finding"
+    assert sqli[0].evidence is not None
+    assert "taint_sources" in sqli[0].evidence
+
+
 def test_detects_sqli_fstring():
     code = """
 def get_user(request):

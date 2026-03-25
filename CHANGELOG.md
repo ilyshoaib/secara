@@ -15,6 +15,8 @@ This changelog is based on repository history starting from the initial commit o
 - Dedicated helpers for finding fingerprints, baseline filtering, incremental discovery, and history persistence.
 - New tests for JS flow-aware analysis and Phase 4-7 feature coverage.
 - Quality budget policy and baseline files for CI regression control.
+- Shared taint/source signature registries for Python and JS analyzers.
+- Taint-path evidence metadata on key Python injection/path findings.
 
 ### Changed
 - JS analyzer upgraded to flow-aware hybrid detection with taint/sanitizer evidence and deduplication.
@@ -23,6 +25,7 @@ This changelog is based on repository history starting from the initial commit o
 - CI quality-gate workflow now generates benchmark artifacts and enforces quality regression budget.
 - CLI scanning now supports policy packs (`balanced`, `strict`) and confidence filtering.
 - Suppression handling supports metadata (`reason=`, `until=YYYY-MM-DD`) with optional enforcement.
+- Verbose and SARIF output now surface structured evidence details when available.
 
 ## [0.6.1] - 2026-03-25
 

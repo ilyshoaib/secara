@@ -24,23 +24,17 @@ import ast
 import logging
 from typing import Dict, List, Optional, Set, Tuple
 
+from secara.taint.signatures import PY_SANITIZERS, PY_TAINTED_PARAM_NAMES
+
 logger = logging.getLogger("secara.taint.interproc")
 
 # ── Sanitizer functions — if taint flows through these, it becomes clean ───────
-_SANITIZERS: Set[str] = {
-    "int", "float", "bool",           # type-coercion kills injection potential
-    "escape", "bleach_clean", "sanitize",
-    "quote", "quote_plus",             # urllib.parse
+# Keep additional sanitizers specific to interprocedural summary logic.
+_SANITIZERS: Set[str] = set(PY_SANITIZERS) | {
+    "bleach_clean", "sanitize",
     "html_escape", "xml_escape",
     "re_escape",
     "b64encode",
-    "literal_eval",                    # ast.literal_eval is safe
-}
-
-# ── Known "entry point" parameter names ────────────────────────────────────────
-_TAINTED_PARAMS: Set[str] = {
-    "request", "req", "event", "context", "environ",
-    "params", "data", "payload", "body", "form",
 }
 
 
@@ -106,7 +100,7 @@ class ModuleTaintGraph:
 
         # Params
         for arg in func.args.args:
-            if arg.arg in _TAINTED_PARAMS:
+            if arg.arg in PY_TAINTED_PARAM_NAMES:
                 tainted.add(arg.arg)
                 summary.tainted_params.add(arg.arg)
 

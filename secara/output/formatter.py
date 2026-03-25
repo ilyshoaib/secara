@@ -130,6 +130,13 @@ def output_rich(findings: List[Finding], verbose: bool = False) -> None:
                         (0, 4),
                     )
                 )
+                if finding.evidence:
+                    console.print(
+                        Padding(
+                            f"[bold magenta]Evidence:[/bold magenta] {finding.evidence}",
+                            (0, 4),
+                        )
+                    )
                 console.print(
                     Padding(
                         f"[bold green]Fix:[/bold green] {finding.fix}",
@@ -261,7 +268,8 @@ def output_sarif(findings: List[Finding], output_file: str | None = None) -> Non
                 "help": {"text": f.fix},
                 "properties": {
                     "tags": [getattr(f, "language", "unknown"), f"confidence:{f.confidence.lower()}"],
-                    "security-severity": "9.0" if level == "error" else ("6.0" if level == "warning" else "3.0")
+                    "security-severity": "9.0" if level == "error" else ("6.0" if level == "warning" else "3.0"),
+                    **({"evidence": f.evidence} if f.evidence else {}),
                 }
             }
             
