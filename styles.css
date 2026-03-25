@@ -69,12 +69,20 @@ body {
 .brand {
     display: inline-flex;
     align-items: center;
+    gap: 0.7rem;
     text-decoration: none;
 }
 
 .brand-logo {
-    width: 196px;
-    height: 46px;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+}
+
+.brand-text {
+    color: var(--ink);
+    font-weight: 700;
+    letter-spacing: 0.08em;
 }
 
 .nav-links {
@@ -769,8 +777,13 @@ h2 {
     }
 
     .brand-logo {
-        width: 162px;
-        height: 38px;
+        width: 32px;
+        height: 32px;
+    }
+
+    .brand-text {
+        font-size: 0.94rem;
+        letter-spacing: 0.07em;
     }
 
     .eyebrow {
