@@ -182,6 +182,19 @@ secara scan . --baseline .secara/baseline.json
 secara metrics --limit 20
 ```
 
+### Advanced workflows
+
+```bash
+# Enforce suppression governance (must include reason= and until=YYYY-MM-DD)
+secara scan . --enforce-suppression-metadata
+
+# Focus only on high-confidence actionable findings
+secara scan . --min-confidence HIGH
+
+# Baseline + changed-only fast PR signal
+secara scan . --baseline .secara/baseline.json --changed-only --policy strict
+```
+
 ---
 
 ## 🛡️ Vulnerability Coverage (v0.6.1)
