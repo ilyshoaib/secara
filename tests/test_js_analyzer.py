@@ -16,6 +16,18 @@ db.query("SELECT * FROM users WHERE id=" + id);
     assert "SQL101" in js_ids(code)
 
 
+def test_js_flow_finding_contains_evidence():
+    analyzer = JSAnalyzer()
+    code = """
+const id = req.query.id;
+db.query("SELECT * FROM users WHERE id=" + id);
+"""
+    findings = analyzer.analyze(Path("test.js"), code)
+    sqli = [f for f in findings if f.rule_id == "SQL101"]
+    assert sqli
+    assert sqli[0].evidence is not None
+
+
 def test_ignores_sqli_like_pattern_with_constant_var():
     code = """
 const id = "42";

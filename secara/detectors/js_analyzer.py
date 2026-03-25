@@ -85,12 +85,19 @@ class JSAnalyzer(BaseDetector):
                 line_no = content.count("\n", 0, start_pos) + 1
                 line_text = lines[line_no - 1] if 0 <= line_no - 1 < len(lines) else ""
                 match_text = match.group(0)
+                evidence = None
 
                 if rule.id in _FLOW_SENSITIVE_RULES:
-                    if not self._has_tainted_flow_evidence(
+                    has_flow, tainted_ids = self._has_tainted_flow_evidence(
                         line_text, match_text, tainted_names, sanitized_names
-                    ):
+                    )
+                    if not has_flow:
                         continue
+                    evidence = {
+                        "sink_rule": rule.id,
+                        "taint_sources": tainted_ids,
+                        "taint_path": " -> ".join([*(tainted_ids or ["direct_source"]), rule.id]),
+                    }
                 
                 findings.append(
                     Finding(
@@ -103,6 +110,7 @@ class JSAnalyzer(BaseDetector):
                         description=rule.description,
                         fix=rule.fix,
                         language=language,
+                        evidence=evidence,
                     )
                 )
 
@@ -144,16 +152,18 @@ class JSAnalyzer(BaseDetector):
         match_text: str,
         tainted_names: set[str],
         sanitized_names: set[str],
-    ) -> bool:
+    ) -> tuple[bool, list[str]]:
         if _SOURCE_PATTERN.search(line_text) or _SOURCE_PATTERN.search(match_text):
-            return True
+            return True, ["direct_source"]
 
         tokens = set(_IDENT_PATTERN.findall(match_text)) | set(_IDENT_PATTERN.findall(line_text))
         tainted_used = tokens & tainted_names
         if not tainted_used:
-            return False
+            return False, []
         # If all tainted identifiers in use are explicitly sanitized, suppress.
-        return not tainted_used.issubset(sanitized_names)
+        if tainted_used.issubset(sanitized_names):
+            return False, []
+        return True, sorted(tainted_used)
 
     @staticmethod
     def _deduplicate(findings: list[Finding]) -> list[Finding]:

@@ -32,6 +32,12 @@ rule_thresholds:
   CFG003:
     precision: 1.0
     recall: 1.0
+  SSRF001:
+    precision: 1.0
+    recall: 1.0
+  PATH001:
+    precision: 1.0
+    recall: 1.0
 
 cases:
   # Python SQLi / CMDi
@@ -103,6 +109,59 @@ cases:
           safe = quote(cmd)
           subprocess.run("echo " + safe, shell=True)
 
+  - name: "python sqli interprocedural positive"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "SQL001"
+    expect_finding: true
+    code: |
+      def get_id(request):
+          return request.args.get("id")
+
+      def handler(request, cursor):
+          uid = get_id(request)
+          cursor.execute("SELECT * FROM users WHERE id=" + uid)
+
+  - name: "python ssrf positive"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "SSRF001"
+    expect_finding: true
+    code: |
+      import requests
+      def fetch(request):
+          url = request.args.get("url")
+          requests.get(url)
+
+  - name: "python ssrf allowlisted constant negative"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "SSRF001"
+    expect_finding: false
+    code: |
+      import requests
+      def fetch():
+          requests.get("https://example.com")
+
+  - name: "python path traversal positive"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "PATH001"
+    expect_finding: true
+    code: |
+      def read_file(request):
+          name = request.args.get("f")
+          open(name)
+
+  - name: "python path traversal constant negative"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "PATH001"
+    expect_finding: false
+    code: |
+      def read_file():
+          open("/tmp/safe.txt")
+
   # Secrets
   - name: "secrets github token positive"
     detector: "secrets"
@@ -155,6 +214,16 @@ cases:
       const userId = "42";
       db.query("SELECT * FROM users WHERE id = " + userId);
 
+  - name: "javascript sql101 tainted assignment chain positive"
+    detector: "javascript"
+    extension: ".js"
+    expected_rule: "SQL101"
+    expect_finding: true
+    code: |
+      const id = req.params.id;
+      const q = id;
+      db.query("SELECT * FROM users WHERE id = " + q);
+
   - name: "javascript cmd101 positive"
     detector: "javascript"
     extension: ".js"
@@ -191,6 +260,16 @@ cases:
     code: |
       const target = "https://example.com/ping";
       fetch(target);
+
+  - name: "javascript xss sanitized negative"
+    detector: "javascript"
+    extension: ".js"
+    expected_rule: "XSS101"
+    expect_finding: false
+    code: |
+      const name = req.query.name;
+      const safe = DOMPurify.sanitize(name);
+      elem.innerHTML = safe;
 
   # Config analyzer rules
   - name: "config cfg001 env positive"

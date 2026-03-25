@@ -37,6 +37,7 @@ from secara.detectors.java_analyzer import JavaAnalyzer
 from secara.detectors.php_analyzer import PHPAnalyzer
 from secara.detectors.ruby_analyzer import RubyAnalyzer
 from secara.output.models import Finding
+from secara.output.confidence import calibrate_confidence
 from secara.output.formatter import (
     filter_by_confidence,
     filter_findings,
@@ -391,6 +392,7 @@ def scan_command(
         )
 
     all_findings = scan_files_parallel(files, analyze, max_workers=effective_workers)
+    all_findings = calibrate_confidence(all_findings)
 
     # ── Persist cache ─────────────────────────────────────────────────────
     cache.save()

@@ -98,6 +98,7 @@ class ConfigAnalyzer(BaseDetector):
                         "Ensure .env files are listed in .gitignore and never committed."
                     ),
                     language=file_path.suffix.lstrip("."),
+                    confidence="MEDIUM",
                 ))
 
         return findings
@@ -147,6 +148,7 @@ class ConfigAnalyzer(BaseDetector):
                                 "at runtime: process.env.SECRET_NAME (Node.js) or os.getenv() (Python)."
                             ),
                             language="json",
+                            confidence="MEDIUM",
                         ))
                 elif isinstance(val, (dict, list)):
                     self._walk_json(file_path, val, lines, findings, depth + 1)
@@ -202,6 +204,7 @@ class ConfigAnalyzer(BaseDetector):
                         "Or load from environment at runtime."
                     ),
                     language="yaml",
+                    confidence="MEDIUM",
                 ))
 
         return findings

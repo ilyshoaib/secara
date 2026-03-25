@@ -17,6 +17,8 @@ This changelog is based on repository history starting from the initial commit o
 - Quality budget policy and baseline files for CI regression control.
 - Shared taint/source signature registries for Python and JS analyzers.
 - Taint-path evidence metadata on key Python injection/path findings.
+- Confidence calibration layer applied across detector families during scan aggregation.
+- FN-focused benchmark corpus expansion for interprocedural/flow scenarios.
 
 ### Changed
 - JS analyzer upgraded to flow-aware hybrid detection with taint/sanitizer evidence and deduplication.
