@@ -71,6 +71,14 @@ def test_ignore_metadata_enforced_and_expired():
     assert not _is_suppressed(no_meta, "SQL001", enforce_metadata=True)
 
 
+def test_ignore_metadata_invalid_or_malformed_values():
+    invalid_date = "# secara: ignore[SQL001] reason=ticket until=2099-99-99"
+    malformed_reason = "# secara: ignore[SQL001] reason until=2099-01-01"
+
+    assert not _is_suppressed(invalid_date, "SQL001", enforce_metadata=False)
+    assert not _is_suppressed(malformed_reason, "SQL001", enforce_metadata=True)
+
+
 def test_history_append_and_read(tmp_path: Path):
     hist = tmp_path / "history.jsonl"
     append_history({"files_scanned": 3, "findings_shown": 1}, path=hist)

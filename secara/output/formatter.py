@@ -49,14 +49,19 @@ def filter_by_confidence(findings: List[Finding], min_confidence: str) -> List[F
 
 
 # ── JSON output ───────────────────────────────────────────────────────────────
-def output_json(findings: List[Finding]) -> None:
-    """Print findings as JSON to stdout."""
+def output_json(findings: List[Finding], output_file: str | None = None) -> None:
+    """Print findings as JSON to stdout or write to file."""
     data = []
     for f in findings:
         obj = f.to_dict()
         obj["fingerprint"] = finding_fingerprint(f)
         data.append(obj)
-    print(json.dumps(data, indent=2))
+    out_str = json.dumps(data, indent=2)
+    if output_file:
+        Path(output_file).write_text(out_str, encoding="utf-8")
+        print(f"JSON results written to {output_file}")
+    else:
+        print(out_str)
 
 
 # ── Rich CLI output ───────────────────────────────────────────────────────────
@@ -225,7 +230,7 @@ def render_findings(
     if use_sarif:
         output_sarif(findings, output_file)
     elif use_json:
-        output_json(findings)
+        output_json(findings, output_file)
     elif RICH_AVAILABLE:
         output_rich(findings, verbose=verbose)
     else:
