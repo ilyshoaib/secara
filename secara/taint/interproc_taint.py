@@ -77,6 +77,7 @@ class ModuleTaintGraph:
         self._tree = tree
         self._summaries: Dict[str, FunctionTaintSummary] = {}
         self._built = False
+        self._max_iterations = 5
 
     def build(self) -> None:
         if self._built:
@@ -84,9 +85,22 @@ class ModuleTaintGraph:
         # First pass: collect all function definitions
         for node in ast.walk(self._tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                summary = FunctionTaintSummary(node)
+                self._summaries[node.name] = FunctionTaintSummary(node)
+
+        # Fixed-point pass: bounded interprocedural propagation.
+        # This enables multi-hop return-taint inference (f->g->h chains).
+        for _ in range(self._max_iterations):
+            changed = False
+            for node in ast.walk(self._tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                summary = self._summaries[node.name]
+                before = summary.returns_tainted
                 self._analyze_function(node, summary)
-                self._summaries[node.name] = summary
+                if summary.returns_tainted != before:
+                    changed = True
+            if not changed:
+                break
         self._built = True
         logger.debug("ModuleTaintGraph built: %d functions", len(self._summaries))
 
@@ -133,6 +147,18 @@ class ModuleTaintGraph:
         if isinstance(node, ast.Call):
             if _is_sanitized_call(node):
                 return False  # sanitizer cleans the value
+            # If the callee object is tainted (e.g., request.args.get(...)),
+            # treat the call as tainted.
+            if self._expr_is_tainted(node.func, tainted):
+                return True
+            # Multi-hop propagation: if callee summary is tainted, call is tainted.
+            callee = None
+            if isinstance(node.func, ast.Name):
+                callee = node.func.id
+            elif isinstance(node.func, ast.Attribute):
+                callee = node.func.attr
+            if callee and self.does_return_tainted(callee):
+                return True
             # If any argument is tainted, the call result is tainted
             for arg in node.args:
                 if self._expr_is_tainted(arg, tainted):

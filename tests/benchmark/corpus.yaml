@@ -122,6 +122,22 @@ cases:
           uid = get_id(request)
           cursor.execute("SELECT * FROM users WHERE id=" + uid)
 
+  - name: "python sqli multihop global-request positive"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "SQL001"
+    expect_finding: true
+    code: |
+      def source(request):
+          return request.args.get("id")
+
+      def mid():
+          return source(request)
+
+      def handler(cursor):
+          uid = mid()
+          cursor.execute("SELECT * FROM users WHERE id=" + uid)
+
   - name: "python ssrf positive"
     detector: "python"
     extension: ".py"

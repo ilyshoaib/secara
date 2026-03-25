@@ -19,6 +19,7 @@ This changelog is based on repository history starting from the initial commit o
 - Taint-path evidence metadata on key Python injection/path findings.
 - Confidence calibration layer applied across detector families during scan aggregation.
 - FN-focused benchmark corpus expansion for interprocedural/flow scenarios.
+- Bounded fixed-point interprocedural taint propagation for multi-hop Python call chains.
 
 ### Changed
 - JS analyzer upgraded to flow-aware hybrid detection with taint/sanitizer evidence and deduplication.

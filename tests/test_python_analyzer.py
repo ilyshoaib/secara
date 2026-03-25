@@ -80,6 +80,24 @@ def get_user(request, cursor):
         "Should NOT flag SQLi after numeric sanitization"
 
 
+def test_detects_sqli_via_multihop_interprocedural_chain():
+    code = """
+def source(request):
+    return request.args.get("id")
+
+def mid():
+    # request here models framework-global request proxies.
+    return source(request)
+
+def handler(cursor):
+    uid = mid()
+    cursor.execute("SELECT * FROM users WHERE id=" + uid)
+"""
+    findings = analyze(code)
+    assert any(f.rule_id == "SQL001" for f in findings), \
+        "Should detect SQLi through multi-hop interprocedural chain"
+
+
 # ── Command Injection ─────────────────────────────────────────────────────────
 
 def test_detects_cmdi_os_system():
