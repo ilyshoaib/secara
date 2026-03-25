@@ -3,120 +3,284 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secara | Static Code Security Scanner</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Secara | Open-Source Static Code Security Scanner</title>
+    <meta name="description" content="Secara is an open-source, offline static code security scanner focused on accurate vulnerability detection for real-world development workflows.">
+    <meta name="keywords" content="Secara, SAST, static analysis, code security, open source, vulnerability scanner">
+    <meta property="og:title" content="Secara | Open-Source Static Code Security Scanner">
+    <meta property="og:description" content="Fast, offline, developer-trusted SAST with AST analysis, taint tracking, and multi-language support.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://secara.eu.cc">
+    <link rel="icon" type="image/png" href="logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <meta name="description" content="Secara: Fast, Offline, and Developer-Trusted Static Code Security Scanner for multiple languages.">
-    <link rel="icon" type="image/png" href="logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <header>
-        <nav class="container">
-            <div class="logo">
-                <img src="logo.png" alt="Secara Logo" class="logo-img">
-                <span class="logo-text">SECARA</span>
-            </div>
+    <div class="bg-grid" aria-hidden="true"></div>
+
+    <header class="site-header">
+        <nav class="container nav">
+            <a class="brand" href="#top" aria-label="Secara Home">
+                <img src="logo.png" alt="Secara logo" class="brand-logo">
+                <span class="brand-text">SECARA</span>
+            </a>
             <ul class="nav-links">
                 <li><a href="#features">Features</a></li>
-                <li><a href="#languages">Languages</a></li>
-                <li><a href="#install">Install</a></li>
-                <li><a href="https://github.com/ilyshoaib/secara" class="btn-github">GitHub</a></li>
+                <li><a href="#coverage">Coverage</a></li>
+                <li><a href="#architecture">Architecture</a></li>
+                <li><a href="#releases">Releases</a></li>
+                <li><a href="#docs">Docs</a></li>
+                <li><a class="btn btn-outline" href="https://github.com/ilyshoaib/secara" target="_blank" rel="noreferrer">GitHub</a></li>
             </ul>
         </nav>
     </header>
 
-    <main>
+    <main id="top">
         <section class="hero container">
-            <div class="hero-content">
-                <span class="badge">v0.6.0 Available Now</span>
-                <h1>Detect Real Vulnerabilities, <span class="gradient-text">Zero False Alarms.</span></h1>
-                <p>Secara is a high-performance, offline static code scanner designed to find exploitable security flaws in your codebase before they hit production.</p>
+            <div class="hero-content reveal">
+                <p class="eyebrow">Open Source • GPL-3.0 • Python 3.9+</p>
+                <h1>Static Security Analysis Built for Real Codebases</h1>
+                <p class="hero-copy">
+                    Secara is a CLI-based static code security scanner focused on high-signal findings.
+                    It combines AST analysis, taint tracking, and rule-driven detection to catch exploitable
+                    issues without sending your code to external services.
+                </p>
                 <div class="hero-actions">
-                    <div class="copy-command">
-                        <code>pip install -e .</code>
-                        <button id="copy-btn">Copy</button>
-                    </div>
-                    <a href="#install" class="btn-primary">Quick Start</a>
+                    <a class="btn btn-primary" href="#quickstart">Get Started</a>
+                    <a class="btn btn-outline" href="https://github.com/ilyshoaib/secara" target="_blank" rel="noreferrer">View Repository</a>
+                </div>
+                <div class="badge-row reveal">
+                    <img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python 3.9+ badge">
+                    <img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="GPL-3.0 badge">
+                    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome badge">
+                </div>
+                <div class="quick-command" aria-label="Install command">
+                    <code id="install-command">git clone https://github.com/ilyshoaib/secara.git && cd secara && bash install.sh</code>
+                    <button class="copy-btn" data-copy-target="install-command">Copy</button>
                 </div>
             </div>
-            <div class="hero-visual">
-                <div class="code-terminal">
-                    <div class="terminal-header">
-                        <span class="dot"></span>
-                        <span class="dot"></span>
-                        <span class="dot"></span>
+            <div class="hero-panel reveal">
+                <div class="terminal">
+                    <div class="terminal-head">
+                        <span></span><span></span><span></span>
                     </div>
-                    <div class="terminal-body" id="terminal-content">
-                        <span class="line">$ secara scan .</span>
-                        <span class="line">🔍 Scanning 450 files...</span>
-                        <span class="line-finding">[HIGH] SQL Injection found in app.py:45</span>
-                        <span class="line-finding">[MEDIUM] Hardcoded API Key in config.py:12</span>
-                        <span class="line">✅ Scan complete: 2 findings.</span>
-                    </div>
+                    <pre class="terminal-body"><code>$ secara scan ./src --severity HIGH
+[HIGH] SQL001  SQLi via dynamic query in app.py:45
+[HIGH] CMD001  Unsafe os.system input in tasks.py:19
+[MEDIUM] SEC014 High-entropy token candidate in config.js:11
+✅ Scan complete: 3 findings | 1,294 files | 2.4s</code></pre>
+                </div>
+                <div class="stats-grid">
+                    <article>
+                        <strong>35+</strong>
+                        <span>secret patterns</span>
+                    </article>
+                    <article>
+                        <strong>Tier 1</strong>
+                        <span>Python, JS, TS</span>
+                    </article>
+                    <article>
+                        <strong>SARIF</strong>
+                        <span>CI-ready output</span>
+                    </article>
+                    <article>
+                        <strong>Offline</strong>
+                        <span>no code upload</span>
+                    </article>
                 </div>
             </div>
         </section>
 
-        <section id="features" class="features container">
-            <h2 class="section-title">Why use Secara?</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <div class="card-icon">🔐</div>
-                    <h3>Secrets Detection</h3>
-                    <p>Detect 35+ patterns including AWS keys, GitHub tokens, and private keys.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="card-icon">💉</div>
-                    <h3>AST-Based Analysis</h3>
-                    <p>Hybrid of AST analysis and taint tracking for high accuracy and low noise.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="card-icon">⚡</div>
-                    <h3>Blazing Fast</h3>
-                    <p>Scan 1,000 files in seconds. Parallelized architecture fits any CI/CD.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="card-icon">🌍</div>
-                    <h3>Runs Fully Offline</h3>
-                    <p>No cloud APIs, no data telemetry. Your code stays on your machine.</p>
-                </div>
+        <section id="features" class="section container">
+            <div class="section-head reveal">
+                <p class="eyebrow">Core Capabilities</p>
+                <h2>Designed for Security Teams and Contributors</h2>
+            </div>
+            <div class="card-grid">
+                <article class="card reveal">
+                    <h3>High-Signal Vulnerability Detection</h3>
+                    <p>Detects SQL injection, command injection, SSRF, insecure deserialization, path traversal, weak crypto patterns, and exposed credentials.</p>
+                </article>
+                <article class="card reveal">
+                    <h3>Hybrid Analysis Engine</h3>
+                    <p>Combines AST analysis, regex matching, and Python interprocedural taint tracking to reduce noise while preserving coverage.</p>
+                </article>
+                <article class="card reveal">
+                    <h3>Built for CLI and CI</h3>
+                    <p>Runs locally via CLI and exports machine-readable JSON or SARIF output for automated checks in CI pipelines.</p>
+                </article>
+                <article class="card reveal">
+                    <h3>Offline by Default</h3>
+                    <p>No telemetry or code upload for core scanning. Your source stays on your machine and inside your environment.</p>
+                </article>
             </div>
         </section>
 
-        <section id="languages" class="languages container">
-            <h2 class="section-title">Multilingual Support</h2>
-            <div class="language-stats">
-                <div class="lang-item">
-                    <strong>Tier 1 (AST)</strong>
-                    <span>Python, JavaScript, TypeScript</span>
+        <section id="coverage" class="section container">
+            <div class="split reveal">
+                <div>
+                    <p class="eyebrow">Language Support</p>
+                    <h2>Multi-Language Coverage Model</h2>
+                    <p>Tiered analyzers balance depth and speed across modern application stacks.</p>
                 </div>
-                <div class="lang-item">
-                    <strong>Tier 2 (Regex-Hybrid)</strong>
-                    <span>Java, Kotlin, PHP, Ruby, Go, Bash</span>
+                <div class="tier-list">
+                    <article>
+                        <h3>Tier 1</h3>
+                        <p>Python, JavaScript, TypeScript</p>
+                        <span>AST-focused analysis and taint-aware detections</span>
+                    </article>
+                    <article>
+                        <h3>Tier 2</h3>
+                        <p>Java, Kotlin, PHP, Ruby, Go, Bash, JSON, YAML, .env</p>
+                        <span>Rule and regex hybrid detections for broad practical coverage</span>
+                    </article>
                 </div>
+            </div>
+            <div class="rule-table-wrap reveal" role="region" aria-label="Sample vulnerability rules">
+                <table class="rule-table">
+                    <thead>
+                        <tr>
+                            <th>Rule ID</th>
+                            <th>Category</th>
+                            <th>Example Detection</th>
+                            <th>Severity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>SEC001</td><td>Hardcoded Secrets</td><td>AWS Access Key ID</td><td>HIGH</td></tr>
+                        <tr><td>SQL001</td><td>SQL Injection</td><td>Dynamic SQL string in Python</td><td>HIGH</td></tr>
+                        <tr><td>CMD001</td><td>Command Injection</td><td>os.system with dynamic input</td><td>HIGH</td></tr>
+                        <tr><td>CRY001</td><td>Crypto Failures</td><td>Weak hash algorithms</td><td>HIGH</td></tr>
+                        <tr><td>SSRF001</td><td>SSRF</td><td>User-controlled requests.get URL</td><td>HIGH</td></tr>
+                        <tr><td>DSER001</td><td>Deserialization</td><td>Unsafe pickle.loads usage</td><td>HIGH</td></tr>
+                    </tbody>
+                </table>
             </div>
         </section>
 
-        <section id="install" class="install-section">
+        <section id="architecture" class="section section-alt">
             <div class="container">
-                <h2 class="section-title">Get Started in Seconds</h2>
-                <div class="install-box">
-                    <h3>One-line install</h3>
-                    <div class="code-block">
-                        <pre>git clone https://github.com/ilyshoaib/secara.git && cd secara && bash install.sh</pre>
-                    </div>
+                <div class="section-head reveal">
+                    <p class="eyebrow">How It Works</p>
+                    <h2>Scanner Pipeline</h2>
+                </div>
+                <div class="pipeline">
+                    <article class="pipeline-item reveal">
+                        <span>1</span>
+                        <h3>CLI Entry</h3>
+                        <p><code>secara/cli.py</code> parses options and starts scans for files or directories.</p>
+                    </article>
+                    <article class="pipeline-item reveal">
+                        <span>2</span>
+                        <h3>File Scanner + Cache</h3>
+                        <p><code>secara/scanner/file_scanner.py</code> walks source trees and skips unchanged files via SHA-256 cache.</p>
+                    </article>
+                    <article class="pipeline-item reveal">
+                        <span>3</span>
+                        <h3>Language Engine</h3>
+                        <p><code>secara/scanner/language_engine.py</code> dispatches language-specific detectors.</p>
+                    </article>
+                    <article class="pipeline-item reveal">
+                        <span>4</span>
+                        <h3>Detectors + Output</h3>
+                        <p>Detectors generate findings that can be rendered to terminal, JSON, or SARIF for integrations.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="quickstart" class="section container">
+            <div class="section-head reveal">
+                <p class="eyebrow">Quick Start</p>
+                <h2>Install, Scan, Integrate</h2>
+            </div>
+            <div class="command-grid">
+                <article class="command-card reveal">
+                    <h3>Install</h3>
+                    <pre><code id="cmd-install">git clone https://github.com/ilyshoaib/secara.git
+cd secara
+bash install.sh</code></pre>
+                    <button class="copy-btn" data-copy-target="cmd-install">Copy</button>
+                </article>
+                <article class="command-card reveal">
+                    <h3>Run a Scan</h3>
+                    <pre><code id="cmd-scan">secara scan .
+secara scan . --severity HIGH
+secara scan ./src --verbose</code></pre>
+                    <button class="copy-btn" data-copy-target="cmd-scan">Copy</button>
+                </article>
+                <article class="command-card reveal">
+                    <h3>CI Output</h3>
+                    <pre><code id="cmd-ci">secara scan . --json > results.json
+secara scan . --sarif --output secara-results.sarif</code></pre>
+                    <button class="copy-btn" data-copy-target="cmd-ci">Copy</button>
+                </article>
+            </div>
+        </section>
+
+        <section id="releases" class="section section-alt">
+            <div class="container">
+                <div class="section-head reveal">
+                    <p class="eyebrow">Versioning</p>
+                    <h2>Releases and Changelog</h2>
+                </div>
+                <div class="release-grid">
+                    <article class="release-card reveal">
+                        <h3>Latest Stable Line</h3>
+                        <p>Current documented support line is <strong>0.6.x</strong>. Use GitHub Releases for packaged tags and upgrade notes.</p>
+                        <a class="btn btn-outline" href="https://github.com/ilyshoaib/secara/releases" target="_blank" rel="noreferrer">View Releases</a>
+                    </article>
+                    <article class="release-card reveal">
+                        <h3>Track All Versions</h3>
+                        <p>Browse complete tag history to audit version progression and map rule additions over time.</p>
+                        <a class="btn btn-outline" href="https://github.com/ilyshoaib/secara/tags" target="_blank" rel="noreferrer">Browse Tags</a>
+                    </article>
+                    <article class="release-card reveal">
+                        <h3>Project Change Log</h3>
+                        <p>Follow feature updates, detector improvements, and bug fixes in the canonical changelog location.</p>
+                        <a class="btn btn-outline" href="https://github.com/ilyshoaib/secara/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Open Changelog</a>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="docs" class="section container">
+            <div class="split reveal">
+                <div>
+                    <p class="eyebrow">Project Health</p>
+                    <h2>Open-Source Collaboration Ready</h2>
+                    <p>Secara includes clear contribution and security-reporting workflows to support community-driven development.</p>
+                </div>
+                <div class="list-block">
+                    <article>
+                        <h3>Contributing</h3>
+                        <p>Add detectors, reduce false positives, improve performance, or enhance documentation. Test-driven contributions are encouraged.</p>
+                        <a href="https://github.com/ilyshoaib/secara/blob/main/CONTRIBUTING.md" target="_blank" rel="noreferrer">Read CONTRIBUTING.md</a>
+                    </article>
+                    <article>
+                        <h3>Security Policy</h3>
+                        <p>Vulnerabilities in Secara itself should be reported via private advisory, not public issues.</p>
+                        <a href="https://github.com/ilyshoaib/secara/security/advisories/new" target="_blank" rel="noreferrer">Report Security Issue</a>
+                    </article>
+                    <article>
+                        <h3>License</h3>
+                        <p>Distributed under GNU GPLv3 for transparent, auditable security tooling.</p>
+                        <a href="https://github.com/ilyshoaib/secara/blob/main/LICENSE" target="_blank" rel="noreferrer">View License</a>
+                    </article>
                 </div>
             </div>
         </section>
     </main>
 
-    <footer class="container">
-        <p>&copy; 2026 Secara Project. Distributed under GNU GPLv3.</p>
-        <div class="social-links">
-            <a href="https://github.com/ilyshoaib/secara">GitHub</a>
-            <a href="https://secara.eu.cc">Website</a>
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <p>© 2026 Secara Project. Open-source static code security scanner.</p>
+            <div class="footer-links">
+                <a href="https://github.com/ilyshoaib/secara" target="_blank" rel="noreferrer">GitHub</a>
+                <a href="https://secara.eu.cc">Website</a>
+                <a href="https://github.com/ilyshoaib/secara/issues" target="_blank" rel="noreferrer">Issues</a>
+            </div>
         </div>
     </footer>
 
