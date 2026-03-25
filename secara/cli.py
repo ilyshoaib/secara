@@ -23,7 +23,7 @@ from secara.scanner.incremental import collect_changed_files
 from secara.scanner.baseline import (
     filter_new_findings,
     load_baseline_fingerprints,
-    write_baseline,
+    write_baseline as write_baseline_snapshot,
 )
 from secara.scanner.language_engine import get_language_info, LanguageTier
 from secara.scanner.cache import FileCache
@@ -306,7 +306,7 @@ def scan_command(
     workers: int,
     changed_only: bool,
     baseline: Path | None,
-    write_baseline_path: Path | None,
+    write_baseline: Path | None,
     policy: str | None,
     enforce_suppression_metadata: bool,
 ) -> None:
@@ -400,8 +400,8 @@ def scan_command(
         baseline_fps = load_baseline_fingerprints(baseline_path)
         filtered = filter_new_findings(filtered, baseline_fps)
 
-    if write_baseline_path:
-        write_baseline(filtered, write_baseline_path)
+    if write_baseline:
+        write_baseline_snapshot(filtered, write_baseline)
 
     # ── Render ────────────────────────────────────────────────────────────
     render_findings(
