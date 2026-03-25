@@ -573,6 +573,15 @@ h2 {
         grid-template-columns: 1fr;
     }
 
+    .hero {
+        padding-top: 3.25rem;
+        gap: 1.25rem;
+    }
+
+    h1 {
+        max-width: 18ch;
+    }
+
     .pipeline {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -588,20 +597,49 @@ h2 {
 
 @media (max-width: 760px) {
     .site-header {
-        position: static;
-        backdrop-filter: none;
+        backdrop-filter: blur(6px);
+        background: rgba(245, 246, 241, 0.95);
+    }
+
+    .container {
+        padding: 0 1rem;
     }
 
     .nav {
+        min-height: auto;
         flex-direction: column;
         align-items: flex-start;
-        padding: 0.75rem 0;
+        gap: 0.7rem;
+        padding: 0.85rem 0;
     }
 
     .nav-links {
         width: 100%;
-        flex-wrap: wrap;
-        gap: 0.6rem 1rem;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 0.55rem;
+        padding-bottom: 0.25rem;
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .nav-links li {
+        flex: 0 0 auto;
+    }
+
+    .nav-links a {
+        display: inline-flex;
+        align-items: center;
+        height: 35px;
+        padding: 0 0.75rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.78);
+        font-size: 0.84rem;
+    }
+
+    .nav-links .btn-outline {
+        padding: 0 0.95rem;
     }
 
     .card-grid,
@@ -610,17 +648,178 @@ h2 {
         grid-template-columns: 1fr;
     }
 
+    .hero {
+        padding-top: 2.35rem;
+        padding-bottom: 1.65rem;
+        gap: 1rem;
+    }
+
+    h1 {
+        font-size: clamp(1.8rem, 7.3vw, 2.35rem);
+        max-width: none;
+    }
+
+    .hero-copy {
+        font-size: 0.98rem;
+        margin-bottom: 1rem;
+    }
+
+    .hero-actions {
+        width: 100%;
+        gap: 0.55rem;
+    }
+
+    .hero-actions .btn {
+        width: 100%;
+        height: 44px;
+    }
+
+    .badge-row {
+        margin-bottom: 0.7rem;
+    }
+
+    .hero-panel {
+        padding: 0.75rem;
+        border-radius: 14px;
+    }
+
+    .terminal-body {
+        padding: 0.8rem;
+    }
+
+    .terminal-body code {
+        font-size: 0.73rem;
+        line-height: 1.45;
+        word-break: break-word;
+        white-space: pre-wrap;
+    }
+
     .quick-command {
         flex-direction: column;
         align-items: stretch;
+        gap: 0.5rem;
+        padding: 0.5rem;
     }
 
     .quick-command code {
         white-space: pre-wrap;
         word-break: break-word;
+        font-size: 0.75rem;
     }
 
     .copy-btn {
         width: 100%;
+        height: 40px;
+        margin-top: 0;
+    }
+
+    .section {
+        padding: 2.35rem 0;
+    }
+
+    .section-head {
+        margin-bottom: 0.95rem;
+    }
+
+    h2 {
+        max-width: none;
+        font-size: clamp(1.4rem, 6vw, 1.95rem);
+    }
+
+    .card,
+    .pipeline-item,
+    .command-card,
+    .release-card,
+    .list-block article,
+    .tier-list article {
+        padding: 0.85rem;
+        border-radius: 12px;
+    }
+
+    .command-card pre {
+        padding: 0.65rem;
+    }
+
+    .command-card code {
+        font-size: 0.74rem;
+    }
+
+    .rule-table-wrap {
+        border-radius: 12px;
+        margin-top: 0.8rem;
+    }
+
+    .rule-table {
+        min-width: 620px;
+    }
+
+    .rule-table th,
+    .rule-table td {
+        padding: 0.62rem 0.68rem;
+        font-size: 0.82rem;
+    }
+
+    .footer-inner {
+        padding: 0.8rem 0;
+        min-height: auto;
+    }
+
+    .footer-links {
+        width: 100%;
+        justify-content: space-between;
+        gap: 0.4rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 0 0.85rem;
+    }
+
+    .brand-logo {
+        width: 32px;
+        height: 32px;
+    }
+
+    .brand-text {
+        font-size: 0.94rem;
+        letter-spacing: 0.07em;
+    }
+
+    .eyebrow {
+        font-size: 0.69rem;
+        letter-spacing: 0.12em;
+    }
+
+    .stats-grid article {
+        padding: 0.72rem;
+    }
+
+    .stats-grid strong {
+        font-size: 0.92rem;
+    }
+
+    .stats-grid span {
+        font-size: 0.79rem;
+    }
+
+    .badge-row img {
+        height: 18px;
+    }
+
+    .section {
+        padding: 2.05rem 0;
+    }
+
+    .rule-table {
+        min-width: 560px;
+    }
+
+    .footer-inner {
+        font-size: 0.84rem;
+    }
+
+    .footer-links a {
+        font-size: 0.83rem;
     }
 }
