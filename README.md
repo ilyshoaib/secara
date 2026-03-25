@@ -199,6 +199,12 @@ secara scan . --min-confidence HIGH
 
 # Baseline + changed-only fast PR signal
 secara scan . --baseline .secara/baseline.json --changed-only --policy strict
+
+# Impacted graph mode (changed + dependent files)
+secara scan . --impacted-only
+
+# Deterministic sharded scan for CI parallel jobs
+secara scan . --shard-index 0 --shard-count 4
 ```
 
 ---

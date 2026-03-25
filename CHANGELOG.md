@@ -20,6 +20,8 @@ This changelog is based on repository history starting from the initial commit o
 - Confidence calibration layer applied across detector families during scan aggregation.
 - FN-focused benchmark corpus expansion for interprocedural/flow scenarios.
 - Bounded fixed-point interprocedural taint propagation for multi-hop Python call chains.
+- Impacted scan mode (`--impacted-only`) with basic Python/JS reverse dependency expansion.
+- Deterministic scan sharding support (`--shard-index`, `--shard-count`).
 
 ### Changed
 - JS analyzer upgraded to flow-aware hybrid detection with taint/sanitizer evidence and deduplication.

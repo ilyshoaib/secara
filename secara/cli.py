@@ -20,6 +20,7 @@ import click
 from secara import __version__
 from secara.scanner.file_scanner import collect_files, scan_files_parallel
 from secara.scanner.incremental import collect_changed_files
+from secara.scanner.incremental import collect_impacted_files, select_shard
 from secara.scanner.baseline import (
     filter_new_findings,
     load_baseline_fingerprints,
@@ -278,6 +279,24 @@ def cli() -> None:
     help="Scan only changed/untracked files in git.",
 )
 @click.option(
+    "--impacted-only",
+    is_flag=True,
+    default=False,
+    help="Scan changed files plus basic dependent files (impact graph mode).",
+)
+@click.option(
+    "--shard-index",
+    type=int,
+    default=None,
+    help="Shard index (0-based) for deterministic split scanning.",
+)
+@click.option(
+    "--shard-count",
+    type=int,
+    default=None,
+    help="Total shard count for deterministic split scanning.",
+)
+@click.option(
     "--baseline",
     type=click.Path(path_type=Path),
     default=None,
@@ -312,6 +331,9 @@ def scan_command(
     no_cache: bool,
     workers: int,
     changed_only: bool,
+    impacted_only: bool,
+    shard_index: int | None,
+    shard_count: int | None,
     baseline: Path | None,
     write_baseline: Path | None,
     policy: str | None,
@@ -355,7 +377,26 @@ def scan_command(
     if min_confidence == "LOW":
         min_confidence = policy_cfg["min_confidence"]
 
-    if changed_only:
+    if changed_only and impacted_only:
+        raise click.UsageError("Use either --changed-only or --impacted-only, not both.")
+
+    if (shard_index is None) != (shard_count is None):
+        raise click.UsageError("Both --shard-index and --shard-count are required together.")
+    if shard_count is not None:
+        if shard_count <= 0:
+            raise click.UsageError("--shard-count must be > 0.")
+        if shard_index < 0 or shard_index >= shard_count:
+            raise click.UsageError("--shard-index must be in range [0, shard-count).")
+
+    if impacted_only:
+        git_root = path if path.is_dir() else path.parent
+        files = collect_impacted_files(git_root.resolve())
+        if path.is_dir():
+            root_resolved = path.resolve()
+            files = [f for f in files if root_resolved in (f, *f.parents)]
+        else:
+            files = [f for f in files if f.resolve() == path.resolve()]
+    elif changed_only:
         git_root = path if path.is_dir() else path.parent
         files = collect_changed_files(git_root.resolve())
         if path.is_dir():
@@ -365,6 +406,9 @@ def scan_command(
             files = [f for f in files if f.resolve() == path.resolve()]
     else:
         files = collect_files(path)
+    files = sorted(files, key=lambda p: str(p.resolve()))
+    if shard_count is not None:
+        files = select_shard(files, shard_index=shard_index, shard_count=shard_count)
     if not use_json and not sarif and files:
         try:
             from rich.console import Console
