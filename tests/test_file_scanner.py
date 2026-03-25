@@ -99,3 +99,16 @@ def test_collects_js_ts_yaml():
         assert "app.js" in names
         assert "config.ts" in names
         assert "docker-compose.yaml" in names
+
+
+def test_collects_tier2_language_files():
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        make_file(base, "main.go")
+        make_file(base, "App.java")
+        make_file(base, "service.kt")
+        make_file(base, "index.php")
+        make_file(base, "model.rb")
+        files = collect_files(base)
+        names = {f.name for f in files}
+        assert {"main.go", "App.java", "service.kt", "index.php", "model.rb"} <= names

@@ -6,11 +6,21 @@ This changelog is based on repository history starting from the initial commit o
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-03-25
+
+### Added
+- Quality benchmark framework for detector evaluation (`secara.quality`).
+- CI quality-gate workflow to run tests and enforce benchmark thresholds.
+- Benchmark corpus plus dedicated false-positive regression tests.
+
 ### Changed
-- Revamped project website with a more professional structure and visual design.
-- Improved website content depth, including architecture, coverage, quick-start, and project-health sections.
-- Added release/changelog website section and GitHub badge row.
-- Added website deployment workflow and multiple metadata/mobile fixes.
+- Expanded directory file discovery coverage to include configured Tier-2 language extensions (Go, Java/Kotlin, PHP, Ruby families).
+- Reduced SQL false positives by tightening Python dynamic-string handling for plain variable names.
+- Reduced secret false positives for environment/reference-style assignment patterns.
+- Updated project metadata/version references for v0.6.1.
+
+### Fixed
+- Alignment issue where scanner extension discovery lagged behind language analyzer support.
 
 ## [0.6.0] - 2026-03-22
 

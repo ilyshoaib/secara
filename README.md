@@ -165,7 +165,7 @@ secara scan /large/repo --workers 16
 
 ---
 
-## 🛡️ Vulnerability Coverage (v0.6.0)
+## 🛡️ Vulnerability Coverage (v0.6.1)
 
 ### 🔑 Hardcoded Secrets (35+ patterns)
 

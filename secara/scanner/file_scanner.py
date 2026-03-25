@@ -32,6 +32,10 @@ SUPPORTED_EXTENSIONS: set[str] = {
     # Tier 2
     ".sh", ".bash", ".zsh",
     ".json", ".yaml", ".yml",
+    ".go",
+    ".java", ".kt", ".kts",
+    ".php", ".phtml", ".php3", ".php4", ".php5",
+    ".rb", ".erb", ".rake",
     # Config-style secrets
     ".env", ".ini", ".cfg", ".toml", ".conf",
 }

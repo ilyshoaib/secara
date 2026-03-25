@@ -76,7 +76,7 @@ def _is_dynamic_string(node: ast.expr, tainted: set[str]) -> bool:
     - A Call result passed directly
     """
     if isinstance(node, ast.Name):
-        return True  # any variable
+        return node.id in tainted
 
     if isinstance(node, ast.JoinedStr):  # f-string
         return any(

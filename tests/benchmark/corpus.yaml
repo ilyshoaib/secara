@@ -1,0 +1,54 @@
+cases:
+  - name: "python sqli positive"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "SQL001"
+    expect_finding: true
+    code: |
+      def get_user(request, cursor):
+          user_id = request.args.get("id")
+          cursor.execute("SELECT * FROM users WHERE id = '" + user_id + "'")
+
+  - name: "python parameterized query negative"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "SQL001"
+    expect_finding: false
+    code: |
+      def get_user(request, cursor):
+          user_id = request.args.get("id")
+          cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+
+  - name: "python constant variable query negative"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "SQL001"
+    expect_finding: false
+    code: |
+      def list_users(cursor):
+          query = "SELECT * FROM users WHERE active = 1"
+          cursor.execute(query)
+
+  - name: "secrets github token positive"
+    detector: "secrets"
+    extension: ".py"
+    expected_rule: "SEC002"
+    expect_finding: true
+    code: |
+      token = "ghp_A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7"
+
+  - name: "secrets placeholder negative"
+    detector: "secrets"
+    extension: ".py"
+    expected_rule: "SEC013"
+    expect_finding: false
+    code: |
+      password = "your_password"
+
+  - name: "secrets env reference negative"
+    detector: "secrets"
+    extension: ".js"
+    expected_rule: "SEC013"
+    expect_finding: false
+    code: |
+      const api_key = process.env.API_KEY;

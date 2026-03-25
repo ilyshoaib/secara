@@ -122,11 +122,19 @@ class SecretsDetector(BaseDetector):
     ) -> List[Finding]:
         results = []
         for match in _KEYWORD_PATTERN.finditer(line):
-            value = match.group("value").lower()
+            raw_value = match.group("value").strip()
+            value = raw_value.lower()
             if value in _PLACEHOLDER_VALUES:
                 continue
             # Skip if the value looks like a variable reference: ${VAR}, %(VAR)s
             if value.startswith(("${", "%(", "{", "<")):
+                continue
+            # Skip environment variable references and identifier-like pointers.
+            if re.match(r"^(?:process\.env\.[A-Za-z_][A-Za-z0-9_]*|os\.getenv\()", raw_value):
+                continue
+            if "." in raw_value and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_\.]{2,}", raw_value):
+                continue
+            if re.fullmatch(r"[A-Z_][A-Z0-9_]{5,}", raw_value):
                 continue
             results.append(
                 Finding(
