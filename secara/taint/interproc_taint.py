@@ -33,8 +33,7 @@ _SANITIZERS: Set[str] = {
     "quote", "quote_plus",             # urllib.parse
     "html_escape", "xml_escape",
     "re_escape",
-    "b64encode", "b64decode",
-    "strip", "lstrip", "rstrip",       # string methods (limited sanitization)
+    "b64encode",
     "literal_eval",                    # ast.literal_eval is safe
 }
 

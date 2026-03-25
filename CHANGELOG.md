@@ -6,6 +6,20 @@ This changelog is based on repository history starting from the initial commit o
 
 ## [Unreleased]
 
+### Added
+- Incremental scanning support via `--changed-only`.
+- Baseline workflow support (`--baseline`, `--write-baseline`) backed by stable finding fingerprints.
+- Scan history metrics capture plus `secara metrics` command for trend visibility.
+- Dedicated helpers for finding fingerprints, baseline filtering, incremental discovery, and history persistence.
+- New tests for JS flow-aware analysis and Phase 4-7 feature coverage.
+
+### Changed
+- JS analyzer upgraded to flow-aware hybrid detection with taint/sanitizer evidence and deduplication.
+- Output now includes finding confidence and stable fingerprint identifiers in rich/plain/JSON/SARIF outputs.
+- Benchmark quality gate extended with per-rule thresholds.
+- CLI scanning now supports policy packs (`balanced`, `strict`) and confidence filtering.
+- Suppression handling supports metadata (`reason=`, `until=YYYY-MM-DD`) with optional enforcement.
+
 ## [0.6.1] - 2026-03-25
 
 ### Added

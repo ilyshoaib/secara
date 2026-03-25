@@ -28,6 +28,12 @@ from typing import Set
 
 logger = logging.getLogger("secara.taint")
 
+# Known sanitizers that neutralize direct injection primitives.
+_SANITIZER_FUNCS = {
+    "int", "float", "bool",
+    "quote", "quote_plus", "escape", "literal_eval",
+}
+
 # ── Source detector helpers ───────────────────────────────────────────────────
 
 def _is_taint_source(node: ast.expr) -> bool:
@@ -84,6 +90,14 @@ def _attr_chain(node: ast.Attribute) -> str:
     if isinstance(current, ast.Name):
         parts.append(current.id)
     return ".".join(reversed(parts))
+
+
+def _is_sanitized_call(node: ast.Call) -> bool:
+    if isinstance(node.func, ast.Name):
+        return node.func.id in _SANITIZER_FUNCS
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr in _SANITIZER_FUNCS
+    return False
 
 
 # ── Sink detector helpers ─────────────────────────────────────────────────────
@@ -186,7 +200,7 @@ class PythonTaintTracker:
                 if isinstance(t, ast.Name):
                     self._tainted_names.add(t.id)
 
-    def _is_tainted_expr(self, node: ast.expr) -> bool:
+    def _is_tainted_expr(self, node: ast.AST) -> bool:
         """Return True if *node* contains a reference to a tainted variable."""
         if isinstance(node, ast.Name):
             return node.id in self._tainted_names
@@ -200,9 +214,13 @@ class PythonTaintTracker:
             return any(self._is_tainted_expr(child) for child in ast.walk(node)
                        if isinstance(child, ast.Name))
         if isinstance(node, ast.Call):
+            if _is_sanitized_call(node):
+                return False
             return any(
-                self._is_tainted_expr(arg) for arg in node.args + node.keywords
+                self._is_tainted_expr(arg) for arg in node.args
             )
+        if isinstance(node, ast.keyword):
+            return self._is_tainted_expr(node.value)
         if isinstance(node, ast.Subscript):
             return self._is_tainted_expr(node.value)
         # Walk sub-expressions generically

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 import yaml
 
@@ -62,3 +62,21 @@ def evaluate_benchmark(cases: Iterable[BenchmarkCase]) -> BinaryMetrics:
     predictions = [_predict_case(c) for c in case_list]
     labels = [c.expect_finding for c in case_list]
     return compute_binary_metrics(predictions=predictions, labels=labels)
+
+
+def evaluate_benchmark_by_rule(cases: Iterable[BenchmarkCase]) -> Dict[str, BinaryMetrics]:
+    """
+    Compute per-rule metrics for cases that define expected_rule.
+    """
+    grouped: Dict[str, List[BenchmarkCase]] = {}
+    for case in cases:
+        if not case.expected_rule:
+            continue
+        grouped.setdefault(case.expected_rule, []).append(case)
+
+    out: Dict[str, BinaryMetrics] = {}
+    for rule, rule_cases in grouped.items():
+        predictions = [_predict_case(c) for c in rule_cases]
+        labels = [c.expect_finding for c in rule_cases]
+        out[rule] = compute_binary_metrics(predictions=predictions, labels=labels)
+    return out

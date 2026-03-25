@@ -339,6 +339,8 @@ class PythonAnalyzer(BaseDetector):
             tracker.is_arg_tainted(call)
             or self._arg_contains_tainted_name(first_arg, tracker.tainted_names)
         )
+        if not tainted:
+            return None
 
         # Optionally verify SQL content for higher confidence
         prefix_text = _extract_string_constant(
@@ -385,7 +387,11 @@ class PythonAnalyzer(BaseDetector):
                 else [func.value.id] if isinstance(func.value, ast.Name) else []
             if chain and chain[-1] == "os" and call.args:
                 arg0 = call.args[0]
-                if _is_dynamic_string(arg0, tracker.tainted_names):
+                tainted = (
+                    tracker.is_arg_tainted(call)
+                    or self._arg_contains_tainted_name(arg0, tracker.tainted_names)
+                )
+                if _is_dynamic_string(arg0, tracker.tainted_names) and tainted:
                     if "CMD001" not in self.yaml_rules: return None
                     rule = self.yaml_rules["CMD001"]
                     return Finding(
@@ -407,7 +413,11 @@ class PythonAnalyzer(BaseDetector):
                 has_shell_true = self._has_keyword_true(call, "shell")
                 if has_shell_true and call.args:
                     arg0 = call.args[0]
-                    if _is_dynamic_string(arg0, tracker.tainted_names):
+                    tainted = (
+                        tracker.is_arg_tainted(call)
+                        or self._arg_contains_tainted_name(arg0, tracker.tainted_names)
+                    )
+                    if _is_dynamic_string(arg0, tracker.tainted_names) and tainted:
                         return Finding(
                             rule_id="CMD002",
                             rule_name="Command Injection via subprocess with shell=True",

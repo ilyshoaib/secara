@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 from typing import List
 
-from secara.output.models import Finding, SEVERITY_ORDER
+from secara.output.models import Finding, SEVERITY_ORDER, CONFIDENCE_ORDER
+from secara.output.fingerprint import finding_fingerprint
 
 try:
     from rich.console import Console
@@ -41,10 +42,20 @@ def filter_findings(findings: List[Finding], min_severity: str) -> List[Finding]
     return [f for f in findings if SEVERITY_ORDER.get(f.severity.upper(), 99) <= threshold]
 
 
+def filter_by_confidence(findings: List[Finding], min_confidence: str) -> List[Finding]:
+    """Return only findings at or above *min_confidence*."""
+    threshold = CONFIDENCE_ORDER.get(min_confidence.upper(), 99)
+    return [f for f in findings if CONFIDENCE_ORDER.get(f.confidence.upper(), 99) <= threshold]
+
+
 # ── JSON output ───────────────────────────────────────────────────────────────
 def output_json(findings: List[Finding]) -> None:
     """Print findings as JSON to stdout."""
-    data = [f.to_dict() for f in findings]
+    data = []
+    for f in findings:
+        obj = f.to_dict()
+        obj["fingerprint"] = finding_fingerprint(f)
+        data.append(obj)
     print(json.dumps(data, indent=2))
 
 
@@ -87,6 +98,10 @@ def output_rich(findings: List[Finding], verbose: bool = False) -> None:
             console.print(
                 f"  [dim]Line {finding.line_number}[/dim]  "
                 f"[bold]{rel_path}[/bold]:{finding.line_number}",
+                highlight=False,
+            )
+            console.print(
+                f"  [dim]Confidence: {finding.confidence}  Fingerprint: {finding_fingerprint(finding)[:12]}[/dim]",
                 highlight=False,
             )
 
@@ -191,6 +206,7 @@ def output_plain(findings: List[Finding], verbose: bool = False) -> None:
         print(f"\n[{f.severity}] {f.rule_name} ({f.rule_id})")
         print(f"  File: {f.file_path}:{f.line_number}")
         print(f"  Code: {f.snippet}")
+        print(f"  Confidence: {f.confidence}  Fingerprint: {finding_fingerprint(f)}")
         if verbose:
             print(f"  Description: {f.description}")
         print(f"  Fix: {f.fix.splitlines()[0]}")
@@ -239,7 +255,7 @@ def output_sarif(findings: List[Finding], output_file: str | None = None) -> Non
                 "fullDescription": {"text": f.description},
                 "help": {"text": f.fix},
                 "properties": {
-                    "tags": [getattr(f, "language", "unknown")],
+                    "tags": [getattr(f, "language", "unknown"), f"confidence:{f.confidence.lower()}"],
                     "security-severity": "9.0" if level == "error" else ("6.0" if level == "warning" else "3.0")
                 }
             }
@@ -274,7 +290,10 @@ def output_sarif(findings: List[Finding], output_file: str | None = None) -> Non
                         }
                     }
                 }
-            ]
+            ],
+            "fingerprints": {
+                "secaraFingerprint": finding_fingerprint(f)
+            }
         })
 
     sarif_log = {
@@ -301,4 +320,3 @@ def output_sarif(findings: List[Finding], output_file: str | None = None) -> Non
         print(f"SARIF results written to {output_file}")
     else:
         print(out_str)
-

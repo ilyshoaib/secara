@@ -1,3 +1,11 @@
+rule_thresholds:
+  SQL001:
+    precision: 1.0
+    recall: 1.0
+  SEC013:
+    precision: 1.0
+    recall: 1.0
+
 cases:
   - name: "python sqli positive"
     detector: "python"
@@ -45,6 +53,14 @@ cases:
     code: |
       password = "your_password"
 
+  - name: "secrets hardcoded password positive"
+    detector: "secrets"
+    extension: ".py"
+    expected_rule: "SEC013"
+    expect_finding: true
+    code: |
+      password = "SuperSecretPass123"
+
   - name: "secrets env reference negative"
     detector: "secrets"
     extension: ".js"
@@ -52,3 +68,27 @@ cases:
     expect_finding: false
     code: |
       const api_key = process.env.API_KEY;
+
+  - name: "python cmdi positive"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "CMD001"
+    expect_finding: true
+    code: |
+      import os
+      def ping(request):
+          host = request.args.get("host")
+          os.system("ping -c 1 " + host)
+
+  - name: "python cmdi sanitized negative"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "CMD001"
+    expect_finding: false
+    code: |
+      import os
+      from shlex import quote
+      def ping(request):
+          host = request.args.get("host")
+          safe_host = quote(host)
+          os.system("ping -c 1 " + safe_host)

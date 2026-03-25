@@ -112,6 +112,7 @@ class SecretsDetector(BaseDetector):
                         description=f"{rule.description}\nCommitting secrets to source control exposes them to anyone with repository access.",
                         fix=rule.fix,
                         language=file_path.suffix.lstrip("."),
+                        confidence="HIGH",
                     )
                 )
         return results
@@ -155,6 +156,7 @@ class SecretsDetector(BaseDetector):
                         "Use a .env file (excluded from git via .gitignore) for local development."
                     ),
                     language=file_path.suffix.lstrip("."),
+                    confidence="MEDIUM",
                 )
             )
         return results
@@ -207,6 +209,7 @@ class SecretsDetector(BaseDetector):
                             "(e.g., a hash or nonce), add a `# secara: ignore` comment to suppress."
                         ),
                         language=file_path.suffix.lstrip("."),
+                        confidence="LOW",
                     )
                 )
         return results

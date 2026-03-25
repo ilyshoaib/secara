@@ -15,6 +15,7 @@ Config file format:
   output:
     format: rich
     fail_on: HIGH
+  policy: balanced
   workers: 8
 """
 from __future__ import annotations
@@ -37,6 +38,7 @@ _DEFAULTS: Dict[str, Any] = {
         "format": "rich",
         "fail_on": "LOW",
     },
+    "policy": "balanced",
     "workers": 8,
 }
 
@@ -73,6 +75,10 @@ class SecaraConfig:
     @property
     def fail_on(self) -> str:
         return str(self._data.get("output", {}).get("fail_on", "LOW")).upper()
+
+    @property
+    def policy(self) -> str:
+        return str(self._data.get("policy", _DEFAULTS["policy"])).lower()
 
     def is_rule_disabled(self, rule_id: str) -> bool:
         return rule_id in self.disabled_rules

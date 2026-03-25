@@ -6,9 +6,12 @@ Commands:
 """
 from __future__ import annotations
 
+import json
 import logging
+import re
 import sys
 import time
+from datetime import date
 from pathlib import Path
 from typing import List
 
@@ -16,6 +19,12 @@ import click
 
 from secara import __version__
 from secara.scanner.file_scanner import collect_files, scan_files_parallel
+from secara.scanner.incremental import collect_changed_files
+from secara.scanner.baseline import (
+    filter_new_findings,
+    load_baseline_fingerprints,
+    write_baseline,
+)
 from secara.scanner.language_engine import get_language_info, LanguageTier
 from secara.scanner.cache import FileCache
 from secara.detectors.secrets_detector import SecretsDetector
@@ -28,7 +37,12 @@ from secara.detectors.java_analyzer import JavaAnalyzer
 from secara.detectors.php_analyzer import PHPAnalyzer
 from secara.detectors.ruby_analyzer import RubyAnalyzer
 from secara.output.models import Finding
-from secara.output.formatter import render_findings, filter_findings
+from secara.output.formatter import (
+    filter_by_confidence,
+    filter_findings,
+    render_findings,
+)
+from secara.quality.history import append_history, read_history, DEFAULT_HISTORY_PATH
 from secara.config import load_config
 
 # ── IGNORE ANNOTATION ────────────────────────────────────────────────────────
@@ -58,23 +72,44 @@ _RUBY_ANALYZER    = RubyAnalyzer()
 _DEP_SCANNER      = None  # Lazy-loaded on first use
 
 
-def _is_suppressed(line: str, rule_id: str) -> bool:
-    """Return True if the line has a secara ignore annotation that covers rule_id."""
+def _is_suppressed(
+    line: str,
+    rule_id: str,
+    enforce_metadata: bool = False,
+) -> bool:
+    """Return True if the line has a valid secara ignore annotation covering rule_id."""
     if IGNORE_COMMENT not in line:
         return False
-    # Generic suppress — no rule list
-    if f"{IGNORE_COMMENT}[" not in line:
-        return True
-    # Rule-specific suppress: secara: ignore[SQL001,CMD002]
-    import re
+    covered = True
     m = re.search(r"secara:\s*ignore\[([^\]]+)\]", line)
     if m:
         suppressed_ids = {r.strip() for r in m.group(1).split(",")}
-        return rule_id in suppressed_ids
+        covered = rule_id in suppressed_ids
+    if not covered:
+        return False
+
+    reason = re.search(r"\breason\s*=\s*([^\s]+)", line)
+    until = re.search(r"\buntil\s*=\s*(\d{4}-\d{2}-\d{2})", line)
+
+    if until:
+        try:
+            expiry = date.fromisoformat(until.group(1))
+        except ValueError:
+            return False
+        if date.today() > expiry:
+            return False
+
+    if enforce_metadata:
+        return bool(reason and until)
     return True
 
 
-def _analyze_file(file_path: Path, cache: "FileCache", cfg=None) -> List[Finding]:
+def _analyze_file(
+    file_path: Path,
+    cache: "FileCache",
+    cfg=None,
+    enforce_suppression_metadata: bool = False,
+) -> List[Finding]:
     """
     Run all applicable detectors on *file_path*.
     Returns an empty list on any error.
@@ -142,7 +177,11 @@ def _analyze_file(file_path: Path, cache: "FileCache", cfg=None) -> List[Finding
         # Inline suppression
         line_idx = f.line_number - 1
         if 0 <= line_idx < len(lines):
-            if _is_suppressed(lines[line_idx], f.rule_id):
+            if _is_suppressed(
+                lines[line_idx],
+                f.rule_id,
+                enforce_metadata=enforce_suppression_metadata,
+            ):
                 continue
         filtered.append(f)
 
@@ -161,6 +200,11 @@ BANNER = rf"""
 
 [bold cyan]Static Code Security Scanner[/bold cyan]  v{__version__}
 """
+
+POLICY_PRESETS = {
+    "balanced": {"severity": "LOW", "min_confidence": "LOW"},
+    "strict": {"severity": "MEDIUM", "min_confidence": "MEDIUM"},
+}
 
 
 @click.group()
@@ -204,6 +248,13 @@ def cli() -> None:
     help="Minimum severity level to report.",
 )
 @click.option(
+    "--min-confidence",
+    type=click.Choice(["HIGH", "MEDIUM", "LOW"], case_sensitive=False),
+    default="LOW",
+    show_default=True,
+    help="Minimum confidence level to report.",
+)
+@click.option(
     "--no-cache",
     is_flag=True, default=False,
     help="Disable file cache (re-scan everything).",
@@ -213,6 +264,36 @@ def cli() -> None:
     type=int, default=8, show_default=True,
     help="Number of parallel worker threads.",
 )
+@click.option(
+    "--changed-only",
+    is_flag=True,
+    default=False,
+    help="Scan only changed/untracked files in git.",
+)
+@click.option(
+    "--baseline",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Path to baseline fingerprints JSON (filter out existing findings).",
+)
+@click.option(
+    "--write-baseline",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write current findings as baseline fingerprints JSON.",
+)
+@click.option(
+    "--policy",
+    type=click.Choice(["balanced", "strict"], case_sensitive=False),
+    default=None,
+    help="Policy pack preset.",
+)
+@click.option(
+    "--enforce-suppression-metadata",
+    is_flag=True,
+    default=False,
+    help="Require suppression comments to include reason= and until=YYYY-MM-DD.",
+)
 def scan_command(
     path: Path,
     use_json: bool,
@@ -220,8 +301,14 @@ def scan_command(
     sarif: bool,
     output: Path | None,
     severity: str,
+    min_confidence: str,
     no_cache: bool,
     workers: int,
+    changed_only: bool,
+    baseline: Path | None,
+    write_baseline_path: Path | None,
+    policy: str | None,
+    enforce_suppression_metadata: bool,
 ) -> None:
     """
     Scan a file or directory for security vulnerabilities.
@@ -252,7 +339,25 @@ def scan_command(
     cache = FileCache(enabled=not no_cache)
 
     # ── Collect files ─────────────────────────────────────────────────────
-    files = collect_files(path)
+    effective_policy = (policy or cfg.policy or "balanced").lower()
+    policy_cfg = POLICY_PRESETS.get(effective_policy, POLICY_PRESETS["balanced"])
+    severity = severity.upper()
+    min_confidence = min_confidence.upper()
+    if severity == "LOW":
+        severity = policy_cfg["severity"]
+    if min_confidence == "LOW":
+        min_confidence = policy_cfg["min_confidence"]
+
+    if changed_only:
+        git_root = path if path.is_dir() else path.parent
+        files = collect_changed_files(git_root.resolve())
+        if path.is_dir():
+            root_resolved = path.resolve()
+            files = [f for f in files if root_resolved in (f, *f.parents)]
+        else:
+            files = [f for f in files if f.resolve() == path.resolve()]
+    else:
+        files = collect_files(path)
     if not use_json and not sarif and files:
         try:
             from rich.console import Console
@@ -272,7 +377,12 @@ def scan_command(
     effective_workers = workers if workers != 8 else cfg.workers
 
     def analyze(fp: Path) -> List[Finding]:
-        return _analyze_file(fp, cache, cfg)
+        return _analyze_file(
+            fp,
+            cache,
+            cfg,
+            enforce_suppression_metadata=enforce_suppression_metadata,
+        )
 
     all_findings = scan_files_parallel(files, analyze, max_workers=effective_workers)
 
@@ -283,6 +393,15 @@ def scan_command(
 
     # ── Filter by severity ────────────────────────────────────────────────
     filtered = filter_findings(all_findings, severity)
+    filtered = filter_by_confidence(filtered, min_confidence)
+
+    baseline_path = baseline or (Path.cwd() / ".secara" / "baseline.json")
+    if baseline:
+        baseline_fps = load_baseline_fingerprints(baseline_path)
+        filtered = filter_new_findings(filtered, baseline_fps)
+
+    if write_baseline_path:
+        write_baseline(filtered, write_baseline_path)
 
     # ── Render ────────────────────────────────────────────────────────────
     render_findings(
@@ -299,7 +418,7 @@ def scan_command(
             Console().print(
                 f"[dim]⏱  Scan completed in {elapsed:.2f}s — "
                 f"{len(files)} files, {len(all_findings)} total findings "
-                f"({len(filtered)} shown at {severity}+)[/dim]\n"
+                f"({len(filtered)} shown at {severity}+/{min_confidence}+)[/dim]\n"
             )
         except ImportError:
             print(
@@ -307,12 +426,52 @@ def scan_command(
                 f"{len(files)} files, {len(all_findings)} findings\n"
             )
 
+    try:
+        append_history(
+            {
+                "duration_s": round(elapsed, 4),
+                "files_scanned": len(files),
+                "findings_total": len(all_findings),
+                "findings_shown": len(filtered),
+                "severity": severity,
+                "min_confidence": min_confidence,
+                "policy": effective_policy,
+                "changed_only": changed_only,
+            }
+        )
+    except OSError:
+        pass
+
     # ── Exit code ─────────────────────────────────────────────────────────
     sys.exit(1 if filtered else 0)
 
 
 def main() -> None:
     cli()
+
+
+@cli.command("metrics")
+@click.option("--json", "use_json", is_flag=True, default=False, help="Output metrics history as JSON.")
+@click.option("--limit", type=int, default=20, show_default=True, help="Number of recent scans to show.")
+def metrics_command(use_json: bool, limit: int) -> None:
+    """Show historical scan metrics trends."""
+    rows = read_history(DEFAULT_HISTORY_PATH)
+    if limit > 0:
+        rows = rows[-limit:]
+    if use_json:
+        click.echo(json.dumps(rows, indent=2))
+        return
+    if not rows:
+        click.echo("No scan history found.")
+        return
+    click.echo("Recent Scan Metrics:")
+    for row in rows:
+        ts = row.get("timestamp", "?")
+        dur = row.get("duration_s", "?")
+        files = row.get("files_scanned", "?")
+        shown = row.get("findings_shown", "?")
+        policy = row.get("policy", "balanced")
+        click.echo(f"- {ts}  files={files} findings={shown} duration={dur}s policy={policy}")
 
 
 @cli.command("deps")

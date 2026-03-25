@@ -1,6 +1,11 @@
 """Quality metric helpers for benchmark and CI gating workflows."""
 
-from .benchmark import BenchmarkCase, evaluate_benchmark, load_benchmark_cases
+from .benchmark import (
+    BenchmarkCase,
+    evaluate_benchmark,
+    evaluate_benchmark_by_rule,
+    load_benchmark_cases,
+)
 from .metrics import BinaryMetrics, compute_binary_metrics
 
 __all__ = [
@@ -8,5 +13,6 @@ __all__ = [
     "BinaryMetrics",
     "compute_binary_metrics",
     "evaluate_benchmark",
+    "evaluate_benchmark_by_rule",
     "load_benchmark_cases",
 ]

@@ -102,3 +102,27 @@ def test_detects_secret_in_env_file():
     code = "API_KEY=prod_live_5f3a1b2c4d6e7f8a\n"
     findings = analyze(code, ext=".env")
     assert findings, "Should detect secret in .env file"
+
+
+def test_known_token_has_high_confidence():
+    code = 'token = "ghp_A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7"\n'
+    findings = analyze(code)
+    token_findings = [f for f in findings if f.rule_id == "SEC002"]
+    assert token_findings, "Expected GitHub token detection"
+    assert token_findings[0].confidence == "HIGH"
+
+
+def test_keyword_proximity_has_medium_confidence():
+    code = 'password = "SuperSecretPass123"\n'
+    findings = analyze(code)
+    rule13 = [f for f in findings if f.rule_id == "SEC013"]
+    assert rule13, "Expected keyword-proximity detection"
+    assert rule13[0].confidence == "MEDIUM"
+
+
+def test_entropy_has_low_confidence():
+    code = 'token = "Xk9mP2wQzR4nV7tY1aL8cF0jH6bN3eD5"\n'
+    findings = analyze(code)
+    rule14 = [f for f in findings if f.rule_id == "SEC014"]
+    assert rule14, "Expected entropy detection"
+    assert rule14[0].confidence == "LOW"

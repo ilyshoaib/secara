@@ -8,6 +8,7 @@ from typing import Optional
 
 
 SEVERITY_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+CONFIDENCE_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
 
 @dataclass
@@ -23,7 +24,7 @@ class Finding:
     description: str       # Human-readable explanation
     fix: str               # Actionable fix suggestion
     language: str = ""
-    confidence: str = "HIGH"  # HIGH | MEDIUM — reserved for future use
+    confidence: str = "HIGH"  # HIGH | MEDIUM | LOW
 
     def to_dict(self) -> dict:
         return asdict(self)

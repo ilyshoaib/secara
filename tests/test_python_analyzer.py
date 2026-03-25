@@ -56,6 +56,17 @@ cursor.execute("SELECT * FROM users WHERE active = 1")
         "Should NOT flag pure literal SQL queries"
 
 
+def test_no_sqli_on_sanitized_numeric_input():
+    code = """
+def get_user(request, cursor):
+    user_id = int(request.args.get("id"))
+    cursor.execute("SELECT * FROM users WHERE id = " + str(user_id))
+"""
+    findings = analyze(code)
+    assert not any(f.rule_id == "SQL001" for f in findings), \
+        "Should NOT flag SQLi after numeric sanitization"
+
+
 # ── Command Injection ─────────────────────────────────────────────────────────
 
 def test_detects_cmdi_os_system():
@@ -80,6 +91,20 @@ def run(request):
     findings = analyze(code)
     assert any(f.rule_id == "CMD002" for f in findings), \
         "Should detect CMDi via subprocess with shell=True"
+
+
+def test_no_cmdi_subprocess_shell_true_after_quote():
+    code = """
+import subprocess
+from shlex import quote
+def run(request):
+    host = request.args.get("host")
+    safe_host = quote(host)
+    subprocess.run("ping -c 1 " + safe_host, shell=True)
+"""
+    findings = analyze(code)
+    assert not any(f.rule_id == "CMD002" for f in findings), \
+        "Should NOT flag subprocess shell=True when input is shell-escaped"
 
 
 def test_no_cmdi_subprocess_list():

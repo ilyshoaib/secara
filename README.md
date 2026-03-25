@@ -132,6 +132,12 @@ Options:
   -o, --output      Write output to file (useful with --sarif or --json)
   -v, --verbose     Show full descriptions and fix details
   -s, --severity    Minimum severity: HIGH | MEDIUM | LOW  [default: LOW]
+  --min-confidence  Minimum confidence: HIGH | MEDIUM | LOW  [default: LOW]
+  --policy          Policy preset: balanced | strict
+  --changed-only    Scan only changed/untracked git files
+  --baseline        Filter findings already present in baseline fingerprint file
+  --write-baseline  Write current findings to a baseline fingerprint file
+  --enforce-suppression-metadata  Require reason= and until= for suppressions
   --no-cache        Disable file cache (re-scan everything)
   -w, --workers     Number of parallel worker threads  [default: 8]
   -V, --version     Show version and exit
@@ -161,6 +167,19 @@ secara scan . --no-cache
 
 # Scan with more parallel workers
 secara scan /large/repo --workers 16
+
+# Only scan changed files (fast PR checks)
+secara scan . --changed-only
+
+# Strict policy + confidence filtering
+secara scan . --policy strict --min-confidence MEDIUM
+
+# Baseline workflow (new findings only)
+secara scan . --write-baseline .secara/baseline.json
+secara scan . --baseline .secara/baseline.json
+
+# View historical scan trends
+secara metrics --limit 20
 ```
 
 ---
