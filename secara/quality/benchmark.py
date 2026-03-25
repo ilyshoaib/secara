@@ -7,6 +7,8 @@ from typing import Dict, Iterable, List, Optional
 
 import yaml
 
+from secara.detectors.config_analyzer import ConfigAnalyzer
+from secara.detectors.js_analyzer import JSAnalyzer
 from secara.detectors.python_analyzer import PythonAnalyzer
 from secara.detectors.secrets_detector import SecretsDetector
 from secara.quality.metrics import BinaryMetrics, compute_binary_metrics
@@ -44,10 +46,15 @@ def load_benchmark_cases(path: Path) -> List[BenchmarkCase]:
 
 
 def _predict_case(case: BenchmarkCase) -> bool:
+    target = Path(f"benchmark{case.extension}")
     if case.detector == "python":
-        findings = PythonAnalyzer().analyze(Path(f"benchmark{case.extension}"), case.code)
+        findings = PythonAnalyzer().analyze(target, case.code)
+    elif case.detector == "javascript":
+        findings = JSAnalyzer().analyze(target, case.code)
+    elif case.detector == "config":
+        findings = ConfigAnalyzer().analyze(target, case.code)
     elif case.detector == "secrets":
-        findings = SecretsDetector().analyze(Path(f"benchmark{case.extension}"), case.code)
+        findings = SecretsDetector().analyze(target, case.code)
     else:
         raise ValueError(f"Unsupported benchmark detector: {case.detector}")
 

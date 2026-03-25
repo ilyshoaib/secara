@@ -2,11 +2,39 @@ rule_thresholds:
   SQL001:
     precision: 1.0
     recall: 1.0
+  CMD001:
+    precision: 1.0
+    recall: 1.0
+  CMD002:
+    precision: 1.0
+    recall: 1.0
   SEC013:
+    precision: 1.0
+    recall: 1.0
+  SEC002:
+    precision: 1.0
+    recall: 1.0
+  SQL101:
+    precision: 1.0
+    recall: 1.0
+  CMD101:
+    precision: 1.0
+    recall: 1.0
+  SSRF101:
+    precision: 1.0
+    recall: 1.0
+  CFG001:
+    precision: 1.0
+    recall: 1.0
+  CFG002:
+    precision: 1.0
+    recall: 1.0
+  CFG003:
     precision: 1.0
     recall: 1.0
 
 cases:
+  # Python SQLi / CMDi
   - name: "python sqli positive"
     detector: "python"
     extension: ".py"
@@ -17,7 +45,7 @@ cases:
           user_id = request.args.get("id")
           cursor.execute("SELECT * FROM users WHERE id = '" + user_id + "'")
 
-  - name: "python parameterized query negative"
+  - name: "python sqli parameterized negative"
     detector: "python"
     extension: ".py"
     expected_rule: "SQL001"
@@ -27,16 +55,55 @@ cases:
           user_id = request.args.get("id")
           cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
 
-  - name: "python constant variable query negative"
+  - name: "python cmdi os system positive"
     detector: "python"
     extension: ".py"
-    expected_rule: "SQL001"
+    expected_rule: "CMD001"
+    expect_finding: true
+    code: |
+      import os
+      def ping(request):
+          host = request.args.get("host")
+          os.system("ping -c 1 " + host)
+
+  - name: "python cmdi os system sanitized negative"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "CMD001"
     expect_finding: false
     code: |
-      def list_users(cursor):
-          query = "SELECT * FROM users WHERE active = 1"
-          cursor.execute(query)
+      import os
+      from shlex import quote
+      def ping(request):
+          host = request.args.get("host")
+          safe_host = quote(host)
+          os.system("ping -c 1 " + safe_host)
 
+  - name: "python cmdi subprocess shell true positive"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "CMD002"
+    expect_finding: true
+    code: |
+      import subprocess
+      def run(request):
+          cmd = request.form.get("cmd")
+          subprocess.run(cmd, shell=True)
+
+  - name: "python cmdi subprocess shell true sanitized negative"
+    detector: "python"
+    extension: ".py"
+    expected_rule: "CMD002"
+    expect_finding: false
+    code: |
+      import subprocess
+      from shlex import quote
+      def run(request):
+          cmd = request.form.get("cmd")
+          safe = quote(cmd)
+          subprocess.run("echo " + safe, shell=True)
+
+  # Secrets
   - name: "secrets github token positive"
     detector: "secrets"
     extension: ".py"
@@ -45,13 +112,13 @@ cases:
     code: |
       token = "ghp_A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7"
 
-  - name: "secrets placeholder negative"
+  - name: "secrets github token negative placeholder"
     detector: "secrets"
     extension: ".py"
-    expected_rule: "SEC013"
+    expected_rule: "SEC002"
     expect_finding: false
     code: |
-      password = "your_password"
+      token = "YOUR_GITHUB_TOKEN"
 
   - name: "secrets hardcoded password positive"
     detector: "secrets"
@@ -69,26 +136,107 @@ cases:
     code: |
       const api_key = process.env.API_KEY;
 
-  - name: "python cmdi positive"
-    detector: "python"
-    extension: ".py"
-    expected_rule: "CMD001"
+  # JavaScript flow-sensitive rules
+  - name: "javascript sql101 positive"
+    detector: "javascript"
+    extension: ".js"
+    expected_rule: "SQL101"
     expect_finding: true
     code: |
-      import os
-      def ping(request):
-          host = request.args.get("host")
-          os.system("ping -c 1 " + host)
+      const userId = req.query.id;
+      db.query("SELECT * FROM users WHERE id = " + userId);
 
-  - name: "python cmdi sanitized negative"
-    detector: "python"
-    extension: ".py"
-    expected_rule: "CMD001"
+  - name: "javascript sql101 constant negative"
+    detector: "javascript"
+    extension: ".js"
+    expected_rule: "SQL101"
     expect_finding: false
     code: |
-      import os
-      from shlex import quote
-      def ping(request):
-          host = request.args.get("host")
-          safe_host = quote(host)
-          os.system("ping -c 1 " + safe_host)
+      const userId = "42";
+      db.query("SELECT * FROM users WHERE id = " + userId);
+
+  - name: "javascript cmd101 positive"
+    detector: "javascript"
+    extension: ".js"
+    expected_rule: "CMD101"
+    expect_finding: true
+    code: |
+      const cmd = req.body.cmd;
+      exec(cmd);
+
+  - name: "javascript cmd101 sanitized negative"
+    detector: "javascript"
+    extension: ".js"
+    expected_rule: "CMD101"
+    expect_finding: false
+    code: |
+      const cmd = req.body.cmd;
+      const safe = encodeURIComponent(cmd);
+      exec(safe);
+
+  - name: "javascript ssrf101 positive"
+    detector: "javascript"
+    extension: ".js"
+    expected_rule: "SSRF101"
+    expect_finding: true
+    code: |
+      const target = req.query.url;
+      fetch(target);
+
+  - name: "javascript ssrf101 constant negative"
+    detector: "javascript"
+    extension: ".js"
+    expected_rule: "SSRF101"
+    expect_finding: false
+    code: |
+      const target = "https://example.com/ping";
+      fetch(target);
+
+  # Config analyzer rules
+  - name: "config cfg001 env positive"
+    detector: "config"
+    extension: ".env"
+    expected_rule: "CFG001"
+    expect_finding: true
+    code: |
+      DB_PASSWORD=SuperSecret123
+
+  - name: "config cfg001 env placeholder negative"
+    detector: "config"
+    extension: ".env"
+    expected_rule: "CFG001"
+    expect_finding: false
+    code: |
+      DB_PASSWORD=your_password
+
+  - name: "config cfg002 json positive"
+    detector: "config"
+    extension: ".json"
+    expected_rule: "CFG002"
+    expect_finding: true
+    code: |
+      {"api_key": "prod_live_secret_12345"}
+
+  - name: "config cfg002 json placeholder negative"
+    detector: "config"
+    extension: ".json"
+    expected_rule: "CFG002"
+    expect_finding: false
+    code: |
+      {"api_key": "example"}
+
+  - name: "config cfg003 yaml positive"
+    detector: "config"
+    extension: ".yaml"
+    expected_rule: "CFG003"
+    expect_finding: true
+    code: |
+      client_secret: SuperSecretABC123
+
+  - name: "config cfg003 yaml placeholder negative"
+    detector: "config"
+    extension: ".yaml"
+    expected_rule: "CFG003"
+    expect_finding: false
+    code: |
+      client_secret: your_secret
