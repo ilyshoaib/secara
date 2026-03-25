@@ -10,13 +10,17 @@ This changelog is based on repository history starting from the initial commit o
 - Incremental scanning support via `--changed-only`.
 - Baseline workflow support (`--baseline`, `--write-baseline`) backed by stable finding fingerprints.
 - Scan history metrics capture plus `secara metrics` command for trend visibility.
+- Per-rule quality metrics mode via `secara metrics --rules`.
+- `secara quality-report` command for JSON/markdown benchmark artifacts.
 - Dedicated helpers for finding fingerprints, baseline filtering, incremental discovery, and history persistence.
 - New tests for JS flow-aware analysis and Phase 4-7 feature coverage.
+- Quality budget policy and baseline files for CI regression control.
 
 ### Changed
 - JS analyzer upgraded to flow-aware hybrid detection with taint/sanitizer evidence and deduplication.
 - Output now includes finding confidence and stable fingerprint identifiers in rich/plain/JSON/SARIF outputs.
 - Benchmark quality gate extended with per-rule thresholds.
+- CI quality-gate workflow now generates benchmark artifacts and enforces quality regression budget.
 - CLI scanning now supports policy packs (`balanced`, `strict`) and confidence filtering.
 - Suppression handling supports metadata (`reason=`, `until=YYYY-MM-DD`) with optional enforcement.
 

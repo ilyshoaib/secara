@@ -43,6 +43,12 @@ from secara.output.formatter import (
     render_findings,
 )
 from secara.quality.history import append_history, read_history, DEFAULT_HISTORY_PATH
+from secara.quality.report import (
+    build_quality_report,
+    check_quality_budget,
+    load_json_file,
+    write_report_files,
+)
 from secara.config import load_config
 
 # ── IGNORE ANNOTATION ────────────────────────────────────────────────────────
@@ -453,8 +459,30 @@ def main() -> None:
 @cli.command("metrics")
 @click.option("--json", "use_json", is_flag=True, default=False, help="Output metrics history as JSON.")
 @click.option("--limit", type=int, default=20, show_default=True, help="Number of recent scans to show.")
-def metrics_command(use_json: bool, limit: int) -> None:
+@click.option("--rules", is_flag=True, default=False, help="Show benchmark per-rule quality metrics.")
+@click.option(
+    "--corpus",
+    type=click.Path(path_type=Path),
+    default=Path("tests/benchmark/corpus.yaml"),
+    show_default=True,
+    help="Benchmark corpus file to evaluate when --rules is used.",
+)
+def metrics_command(use_json: bool, limit: int, rules: bool, corpus: Path) -> None:
     """Show historical scan metrics trends."""
+    if rules:
+        report = build_quality_report(corpus)
+        if use_json:
+            click.echo(json.dumps(report, indent=2))
+            return
+        click.echo("Per-Rule Quality Metrics:")
+        for rule_id in sorted(report["rules"]):
+            r = report["rules"][rule_id]
+            click.echo(
+                f"- {rule_id}: P={r['precision']:.3f} R={r['recall']:.3f} "
+                f"F1={r['f1']:.3f} pass={'yes' if r['pass'] else 'no'}"
+            )
+        return
+
     rows = read_history(DEFAULT_HISTORY_PATH)
     if limit > 0:
         rows = rows[-limit:]
@@ -472,6 +500,78 @@ def metrics_command(use_json: bool, limit: int) -> None:
         shown = row.get("findings_shown", "?")
         policy = row.get("policy", "balanced")
         click.echo(f"- {ts}  files={files} findings={shown} duration={dur}s policy={policy}")
+
+
+@cli.command("quality-report")
+@click.option(
+    "--corpus",
+    type=click.Path(path_type=Path),
+    default=Path("tests/benchmark/corpus.yaml"),
+    show_default=True,
+    help="Benchmark corpus YAML path.",
+)
+@click.option(
+    "--json-output",
+    type=click.Path(path_type=Path),
+    default=Path("artifacts/quality_report.json"),
+    show_default=True,
+    help="Path to write JSON quality report.",
+)
+@click.option(
+    "--md-output",
+    type=click.Path(path_type=Path),
+    default=Path("artifacts/quality_report.md"),
+    show_default=True,
+    help="Path to write markdown quality report.",
+)
+@click.option(
+    "--enforce-budget",
+    is_flag=True,
+    default=False,
+    help="Fail if quality regresses beyond budget limits.",
+)
+@click.option(
+    "--baseline-file",
+    type=click.Path(path_type=Path),
+    default=Path(".github/quality_baseline.json"),
+    show_default=True,
+    help="Baseline quality report JSON for budget comparisons.",
+)
+@click.option(
+    "--budget-file",
+    type=click.Path(path_type=Path),
+    default=Path(".github/quality_budget.json"),
+    show_default=True,
+    help="Budget policy JSON (allowed regressions).",
+)
+def quality_report_command(
+    corpus: Path,
+    json_output: Path,
+    md_output: Path,
+    enforce_budget: bool,
+    baseline_file: Path,
+    budget_file: Path,
+) -> None:
+    """Generate benchmark quality report artifacts and enforce regression budget."""
+    report = build_quality_report(corpus)
+    write_report_files(report, json_output, md_output)
+    click.echo(f"Wrote quality report JSON to {json_output}")
+    click.echo(f"Wrote quality report markdown to {md_output}")
+
+    if not enforce_budget:
+        return
+    if not baseline_file.exists() or not budget_file.exists():
+        click.echo("Budget enforcement requested but baseline/budget file is missing.", err=True)
+        sys.exit(2)
+
+    baseline = load_json_file(baseline_file)
+    budget = load_json_file(budget_file)
+    violations = check_quality_budget(report, baseline, budget)
+    if violations:
+        click.echo("Quality budget violations detected:", err=True)
+        for v in violations:
+            click.echo(f"- {v}", err=True)
+        sys.exit(1)
 
 
 @cli.command("deps")

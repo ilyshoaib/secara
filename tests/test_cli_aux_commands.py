@@ -64,3 +64,11 @@ def test_metrics_command_json_and_plain(monkeypatch):
     assert as_plain.exit_code == 0
     assert "Recent Scan Metrics:" in as_plain.output
     assert "files=10" in as_plain.output
+
+
+def test_metrics_command_rules_mode():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["metrics", "--rules"])
+    assert result.exit_code == 0
+    assert "Per-Rule Quality Metrics:" in result.output
+    assert "SQL001" in result.output

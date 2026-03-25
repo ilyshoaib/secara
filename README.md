@@ -180,6 +180,12 @@ secara scan . --baseline .secara/baseline.json
 
 # View historical scan trends
 secara metrics --limit 20
+
+# Show per-rule benchmark quality metrics
+secara metrics --rules
+
+# Generate benchmark quality report artifacts (JSON + markdown)
+secara quality-report --json-output artifacts/quality_report.json --md-output artifacts/quality_report.md
 ```
 
 ### Advanced workflows

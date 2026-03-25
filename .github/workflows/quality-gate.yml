@@ -27,3 +27,18 @@ jobs:
 
       - name: Run tests (includes benchmark quality gate)
         run: pytest -q
+
+      - name: Generate quality report and enforce regression budget
+        run: |
+          python -m secara.cli quality-report \
+            --json-output artifacts/quality_report.json \
+            --md-output artifacts/quality_report.md \
+            --enforce-budget \
+            --baseline-file .github/quality_baseline.json \
+            --budget-file .github/quality_budget.json
+
+      - name: Upload quality artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: secara-quality-report
+          path: artifacts/

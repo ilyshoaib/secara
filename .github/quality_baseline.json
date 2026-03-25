@@ -1,0 +1,132 @@
+{
+  "corpus": "tests/benchmark/corpus.yaml",
+  "global": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "false_positive_rate": 0.0
+  },
+  "rules": {
+    "SQL001": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "CMD001": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "CMD002": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "SEC002": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "SEC013": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "SQL101": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "CMD101": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "SSRF101": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "CFG001": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "CFG002": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    },
+    "CFG003": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "thresholds": {
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "pass": true
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "global": {
+    "precision_drop": 0.02,
+    "recall_drop": 0.02,
+    "fpr_increase": 0.01
+  },
+  "per_rule": {
+    "precision_drop": 0.05,
+    "recall_drop": 0.05
+  }
+}
