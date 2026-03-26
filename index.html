@@ -56,7 +56,7 @@
                     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome badge">
                 </div>
                 <div class="quick-command" aria-label="Install command">
-                    <code id="install-command">git clone https://github.com/ilyshoaib/secara.git && cd secara && bash install.sh</code>
+                    <code id="install-command">pip install secara</code>
                     <button class="copy-btn" data-copy-target="install-command">Copy</button>
                 </div>
             </div>
@@ -198,9 +198,8 @@
             <div class="command-grid">
                 <article class="command-card reveal">
                     <h3>Install</h3>
-                    <pre><code id="cmd-install">git clone https://github.com/ilyshoaib/secara.git
-cd secara
-bash install.sh</code></pre>
+                    <pre><code id="cmd-install">pip install secara
+pip install --upgrade secara</code></pre>
                     <button class="copy-btn" data-copy-target="cmd-install">Copy</button>
                 </article>
                 <article class="command-card reveal">
@@ -228,7 +227,12 @@ secara scan . --sarif --output secara-results.sarif</code></pre>
                 <div class="release-grid">
                     <article class="release-card reveal">
                         <h3>Latest Stable Line</h3>
-                        <p>Current documented support line is <strong>0.6.x</strong>. Use GitHub Releases for packaged tags and upgrade notes.</p>
+                        <p>Current stable release is <strong>0.10.0</strong>. Install directly from PyPI and use GitHub Releases for tag-level notes.</p>
+                        <a class="btn btn-outline" href="https://pypi.org/project/secara/" target="_blank" rel="noreferrer">View on PyPI</a>
+                    </article>
+                    <article class="release-card reveal">
+                        <h3>GitHub Releases</h3>
+                        <p>Use GitHub Releases for packaged tags, release notes, and migration details.</p>
                         <a class="btn btn-outline" href="https://github.com/ilyshoaib/secara/releases" target="_blank" rel="noreferrer">View Releases</a>
                     </article>
                     <article class="release-card reveal">
