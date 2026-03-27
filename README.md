@@ -138,6 +138,7 @@ Options:
   --baseline        Filter findings already present in baseline fingerprint file
   --write-baseline  Write current findings to a baseline fingerprint file
   --enforce-suppression-metadata  Require reason= and until= for suppressions
+  --profile-scan    Show stage timings and cache stats
   --no-cache        Disable file cache (re-scan everything)
   -w, --workers     Number of parallel worker threads  [default: 8]
   -V, --version     Show version and exit
@@ -205,6 +206,12 @@ secara scan . --impacted-only
 
 # Deterministic sharded scan for CI parallel jobs
 secara scan . --shard-index 0 --shard-count 4
+
+# Print scan stage timings and cache hit/miss stats
+secara scan . --profile-scan
+
+# Benchmark scanner throughput (for CI trend tracking)
+secara benchmark . --runs 5 --warmup 1 --json
 ```
 
 ---

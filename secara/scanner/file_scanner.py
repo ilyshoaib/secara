@@ -101,8 +101,10 @@ def _should_include_file(file_path: Path) -> bool:
     except OSError:
         return False
 
-    # Binary check
-    if _is_binary(file_path):
+    # Binary probe is relatively expensive. For known textual extensions
+    # we skip this extra read and rely on decoding with replacement later.
+    # Keep probe for extensionless files like Dockerfile/.envrc.
+    if suffix == "" and _is_binary(file_path):
         return False
 
     return True

@@ -7,8 +7,11 @@ Commands:
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
+import os
 import re
+import statistics
 import sys
 import time
 from datetime import date
@@ -130,15 +133,23 @@ def _analyze_file(
         return []
 
     try:
-        content = file_path.read_text(encoding="utf-8", errors="replace")
+        st = file_path.stat()
+        cached = cache.get(file_path, stat_result=st)
+        if cached is not None:
+            from secara.output.models import Finding as F
+            return [F(**d) for d in cached] if cached else []
+
+        raw = file_path.read_bytes()
     except OSError:
         return []
 
-    # Check cache
-    cached = cache.get(file_path)
+    file_hash = hashlib.sha256(raw).hexdigest()
+    cached = cache.get(file_path, file_hash=file_hash, stat_result=st)
     if cached is not None:
         from secara.output.models import Finding as F
         return [F(**d) for d in cached] if cached else []
+
+    content = raw.decode("utf-8", errors="replace")
 
     findings: List[Finding] = []
     tier, language = get_language_info(file_path)
@@ -193,7 +204,7 @@ def _analyze_file(
                 continue
         filtered.append(f)
 
-    cache.set(file_path, filtered)
+    cache.set(file_path, filtered, file_hash=file_hash, stat_result=st)
     return filtered
 
 
@@ -320,6 +331,12 @@ def cli() -> None:
     default=False,
     help="Require suppression comments to include reason= and until=YYYY-MM-DD.",
 )
+@click.option(
+    "--profile-scan",
+    is_flag=True,
+    default=False,
+    help="Show stage timings and cache stats for scan performance profiling.",
+)
 def scan_command(
     path: Path,
     use_json: bool,
@@ -338,6 +355,7 @@ def scan_command(
     write_baseline: Path | None,
     policy: str | None,
     enforce_suppression_metadata: bool,
+    profile_scan: bool,
 ) -> None:
     """
     Scan a file or directory for security vulnerabilities.
@@ -366,8 +384,13 @@ def scan_command(
 
     start_time = time.perf_counter()
     cache = FileCache(enabled=not no_cache)
+    stage_collect_s = 0.0
+    stage_analyze_s = 0.0
+    stage_render_s = 0.0
+    stage_filter_s = 0.0
 
     # ── Collect files ─────────────────────────────────────────────────────
+    t_collect_start = time.perf_counter()
     effective_policy = (policy or cfg.policy or "balanced").lower()
     policy_cfg = POLICY_PRESETS.get(effective_policy, POLICY_PRESETS["balanced"])
     severity = severity.upper()
@@ -409,6 +432,7 @@ def scan_command(
     files = sorted(files, key=lambda p: str(p.resolve()))
     if shard_count is not None:
         files = select_shard(files, shard_index=shard_index, shard_count=shard_count)
+    stage_collect_s = time.perf_counter() - t_collect_start
     if not use_json and not sarif and files:
         try:
             from rich.console import Console
@@ -424,8 +448,12 @@ def scan_command(
         sys.exit(0)
 
     # ── Parallel scan ─────────────────────────────────────────────────────
-    # CLI --workers flag overrides secara.yaml workers
-    effective_workers = workers if workers != 8 else cfg.workers
+    # CLI --workers flag overrides secara.yaml workers.
+    # If both are untouched defaults (8), scale automatically with CPU count.
+    if workers == 8 and cfg.workers == 8:
+        effective_workers = min(32, max(4, (os.cpu_count() or 4) * 4))
+    else:
+        effective_workers = workers if workers != 8 else cfg.workers
 
     def analyze(fp: Path) -> List[Finding]:
         return _analyze_file(
@@ -435,8 +463,10 @@ def scan_command(
             enforce_suppression_metadata=enforce_suppression_metadata,
         )
 
+    t_analyze_start = time.perf_counter()
     all_findings = scan_files_parallel(files, analyze, max_workers=effective_workers)
     all_findings = calibrate_confidence(all_findings)
+    stage_analyze_s = time.perf_counter() - t_analyze_start
 
     # ── Persist cache ─────────────────────────────────────────────────────
     cache.save()
@@ -444,6 +474,7 @@ def scan_command(
     elapsed = time.perf_counter() - start_time
 
     # ── Filter by severity ────────────────────────────────────────────────
+    t_filter_start = time.perf_counter()
     filtered = filter_findings(all_findings, severity)
     filtered = filter_by_confidence(filtered, min_confidence)
 
@@ -454,8 +485,10 @@ def scan_command(
 
     if write_baseline:
         write_baseline_snapshot(filtered, write_baseline)
+    stage_filter_s = time.perf_counter() - t_filter_start
 
     # ── Render ────────────────────────────────────────────────────────────
+    t_render_start = time.perf_counter()
     render_findings(
         filtered,
         use_json=use_json,
@@ -463,6 +496,7 @@ def scan_command(
         output_file=str(output) if output else None,
         verbose=verbose,
     )
+    stage_render_s = time.perf_counter() - t_render_start
 
     if not use_json and not sarif:
         try:
@@ -476,6 +510,32 @@ def scan_command(
             print(
                 f"\nScan completed in {elapsed:.2f}s — "
                 f"{len(files)} files, {len(all_findings)} findings\n"
+            )
+
+    if profile_scan:
+        profile = {
+            "total_s": round(elapsed, 4),
+            "collect_s": round(stage_collect_s, 4),
+            "analyze_s": round(stage_analyze_s, 4),
+            "filter_s": round(stage_filter_s, 4),
+            "render_s": round(stage_render_s, 4),
+            "files": len(files),
+            "workers": effective_workers,
+            "cache": cache.stats(),
+        }
+        if use_json or sarif:
+            click.echo(json.dumps({"scan_profile": profile}, indent=2), err=True)
+        else:
+            click.echo("\nScan Profile:")
+            click.echo(
+                f"- total={profile['total_s']}s collect={profile['collect_s']}s "
+                f"analyze={profile['analyze_s']}s filter={profile['filter_s']}s "
+                f"render={profile['render_s']}s"
+            )
+            click.echo(
+                f"- files={profile['files']} workers={profile['workers']} "
+                f"cache_hits={profile['cache'].get('hits', 0)} "
+                f"cache_misses={profile['cache'].get('misses', 0)}"
             )
 
     try:
@@ -546,6 +606,137 @@ def metrics_command(use_json: bool, limit: int, rules: bool, corpus: Path) -> No
         shown = row.get("findings_shown", "?")
         policy = row.get("policy", "balanced")
         click.echo(f"- {ts}  files={files} findings={shown} duration={dur}s policy={policy}")
+
+
+@cli.command("benchmark")
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.option("--runs", type=int, default=5, show_default=True, help="Measured benchmark runs.")
+@click.option("--warmup", type=int, default=1, show_default=True, help="Warmup runs.")
+@click.option(
+    "--workers", "-w",
+    type=int, default=8, show_default=True,
+    help="Number of parallel worker threads.",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True, default=False,
+    help="Disable file cache (re-scan everything).",
+)
+@click.option(
+    "--changed-only",
+    is_flag=True,
+    default=False,
+    help="Benchmark changed/untracked files in git only.",
+)
+@click.option(
+    "--impacted-only",
+    is_flag=True,
+    default=False,
+    help="Benchmark changed files plus dependents (impact graph mode).",
+)
+@click.option(
+    "--json", "use_json",
+    is_flag=True, default=False,
+    help="Output benchmark summary as JSON.",
+)
+def benchmark_command(
+    path: Path,
+    runs: int,
+    warmup: int,
+    workers: int,
+    no_cache: bool,
+    changed_only: bool,
+    impacted_only: bool,
+    use_json: bool,
+) -> None:
+    """Benchmark scan throughput for CI trend tracking."""
+    if runs <= 0:
+        raise click.UsageError("--runs must be > 0.")
+    if warmup < 0:
+        raise click.UsageError("--warmup must be >= 0.")
+    if changed_only and impacted_only:
+        raise click.UsageError("Use either --changed-only or --impacted-only, not both.")
+
+    cfg = load_config(path if path.is_dir() else path.parent)
+    if impacted_only:
+        git_root = path if path.is_dir() else path.parent
+        files = collect_impacted_files(git_root.resolve())
+        if path.is_dir():
+            root_resolved = path.resolve()
+            files = [f for f in files if root_resolved in (f, *f.parents)]
+        else:
+            files = [f for f in files if f.resolve() == path.resolve()]
+    elif changed_only:
+        git_root = path if path.is_dir() else path.parent
+        files = collect_changed_files(git_root.resolve())
+        if path.is_dir():
+            root_resolved = path.resolve()
+            files = [f for f in files if root_resolved in (f, *f.parents)]
+        else:
+            files = [f for f in files if f.resolve() == path.resolve()]
+    else:
+        files = collect_files(path)
+    files = sorted(files, key=lambda p: str(p.resolve()))
+    if not files:
+        click.echo(json.dumps({"error": "No scannable files found."}) if use_json else "No scannable files found.")
+        sys.exit(0)
+
+    effective_workers = workers if workers != 8 else cfg.workers
+    if workers == 8 and cfg.workers == 8:
+        effective_workers = min(32, max(4, (os.cpu_count() or 4) * 4))
+
+    def run_once() -> tuple[float, int]:
+        cache = FileCache(enabled=not no_cache)
+
+        def analyze(fp: Path) -> List[Finding]:
+            return _analyze_file(fp, cache, cfg)
+
+        t0 = time.perf_counter()
+        findings = scan_files_parallel(files, analyze, max_workers=effective_workers)
+        findings = calibrate_confidence(findings)
+        cache.save()
+        return (time.perf_counter() - t0), len(findings)
+
+    for _ in range(warmup):
+        run_once()
+
+    durations: List[float] = []
+    findings_count = 0
+    for _ in range(runs):
+        dur, findings_count = run_once()
+        durations.append(dur)
+
+    ordered = sorted(durations)
+    idx95 = min(len(ordered) - 1, max(0, int(round((len(ordered) - 1) * 0.95))))
+    summary = {
+        "files": len(files),
+        "workers": effective_workers,
+        "runs": runs,
+        "warmup": warmup,
+        "no_cache": no_cache,
+        "findings_total_last_run": findings_count,
+        "timings_s": {
+            "avg": round(statistics.fmean(durations), 4),
+            "min": round(min(durations), 4),
+            "p50": round(statistics.median(durations), 4),
+            "p95": round(ordered[idx95], 4),
+            "max": round(max(durations), 4),
+        },
+    }
+
+    if use_json:
+        click.echo(json.dumps(summary, indent=2))
+    else:
+        click.echo("Benchmark results:")
+        click.echo(
+            f"- files={summary['files']} workers={summary['workers']} "
+            f"runs={summary['runs']} warmup={summary['warmup']} no_cache={summary['no_cache']}"
+        )
+        t = summary["timings_s"]
+        click.echo(
+            f"- avg={t['avg']}s min={t['min']}s p50={t['p50']}s "
+            f"p95={t['p95']}s max={t['max']}s"
+        )
 
 
 @cli.command("quality-report")

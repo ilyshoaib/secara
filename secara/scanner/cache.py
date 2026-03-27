@@ -17,6 +17,7 @@ import hashlib
 import json
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -34,6 +35,34 @@ def _compute_sha256(file_path: Path) -> str:
     return h.hexdigest()
 
 
+def _resolve_cache_file() -> Path:
+    """
+    Pick a writable cache file path.
+    Priority: $SECARA_CACHE_FILE -> ~/.secara/cache.json -> ./.secara/cache.json -> /tmp
+    """
+    env_file = os.environ.get("SECARA_CACHE_FILE")
+    candidates = []
+    if env_file:
+        candidates.append(Path(env_file).expanduser())
+    candidates.extend(
+        [
+            CACHE_FILE,
+            Path.cwd() / ".secara" / "cache.json",
+            Path("/tmp") / f"secara-cache-{os.getuid()}.json",
+        ]
+    )
+
+    for candidate in candidates:
+        try:
+            candidate.parent.mkdir(parents=True, exist_ok=True)
+            with open(candidate, "a", encoding="utf-8"):
+                pass
+            return candidate
+        except OSError:
+            continue
+    return candidates[-1]
+
+
 class FileCache:
     """Persistent file-level scan cache keyed by absolute path + SHA-256 hash."""
 
@@ -41,14 +70,23 @@ class FileCache:
         self._enabled = enabled
         self._data: dict = {}
         self._dirty: bool = False
+        self._lock = threading.Lock()
+        self._cache_file = _resolve_cache_file()
+        self._hits: int = 0
+        self._misses: int = 0
+        self._sets: int = 0
         if self._enabled:
             self._load()
 
     def _load(self) -> None:
-        if CACHE_FILE.exists():
+        if self._cache_file.exists():
             try:
-                with open(CACHE_FILE, "r", encoding="utf-8") as fh:
-                    self._data = json.load(fh)
+                with open(self._cache_file, "r", encoding="utf-8") as fh:
+                    loaded = json.load(fh)
+                if isinstance(loaded, dict):
+                    self._data = loaded
+                else:
+                    self._data = {}
                 logger.debug("Loaded cache with %d entries", len(self._data))
             except (json.JSONDecodeError, OSError) as exc:
                 logger.debug("Cache load failed (%s), starting fresh", exc)
@@ -59,42 +97,101 @@ class FileCache:
         if not self._enabled or not self._dirty:
             return
         try:
-            CACHE_DIR.mkdir(parents=True, exist_ok=True)
-            with open(CACHE_FILE, "w", encoding="utf-8") as fh:
-                json.dump(self._data, fh, indent=2)
+            self._cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with self._lock:
+                snapshot = dict(self._data)
+            with open(self._cache_file, "w", encoding="utf-8") as fh:
+                json.dump(snapshot, fh, indent=2)
             logger.debug("Cache saved (%d entries)", len(self._data))
         except OSError as exc:
             logger.warning("Could not save cache: %s", exc)
 
-    def get(self, file_path: Path) -> Optional[list]:
+    def get(
+        self,
+        file_path: Path,
+        *,
+        file_hash: str | None = None,
+        stat_result: os.stat_result | None = None,
+    ) -> Optional[list]:
         """
         Return cached findings list if *file_path* hasn't changed, else None.
+        Fast path uses mtime+size; optional SHA-256 check validates content identity.
         """
         if not self._enabled:
             return None
         key = str(file_path.resolve())
-        entry = self._data.get(key)
+        with self._lock:
+            entry = self._data.get(key)
         if entry is None:
+            with self._lock:
+                self._misses += 1
             return None
-        current_sha = _compute_sha256(file_path)
-        if entry.get("sha256") == current_sha:
+
+        try:
+            st = stat_result or file_path.stat()
+        except OSError:
+            with self._lock:
+                self._misses += 1
+            return None
+
+        if (
+            entry.get("size") == st.st_size
+            and entry.get("mtime_ns") == st.st_mtime_ns
+        ):
             logger.debug("Cache hit: %s", file_path.name)
+            with self._lock:
+                self._hits += 1
             return entry.get("findings", [])
+
+        # Optional stronger identity check for mtime changes without content changes.
+        if file_hash is not None and entry.get("sha256") == file_hash:
+            logger.debug("Cache hit (sha): %s", file_path.name)
+            with self._lock:
+                self._hits += 1
+            return entry.get("findings", [])
+        with self._lock:
+            self._misses += 1
         return None
 
-    def set(self, file_path: Path, findings: list) -> None:
+    def set(
+        self,
+        file_path: Path,
+        findings: list,
+        *,
+        file_hash: str | None = None,
+        stat_result: os.stat_result | None = None,
+    ) -> None:
         """Store findings for *file_path* in the cache."""
         if not self._enabled:
             return
+        try:
+            st = stat_result or file_path.stat()
+        except OSError:
+            return
         key = str(file_path.resolve())
-        self._data[key] = {
-            "sha256": _compute_sha256(file_path),
-            "findings": [f.to_dict() if hasattr(f, "to_dict") else f for f in findings],
-        }
-        self._dirty = True
+        with self._lock:
+            self._data[key] = {
+                "sha256": file_hash or _compute_sha256(file_path),
+                "size": st.st_size,
+                "mtime_ns": st.st_mtime_ns,
+                "findings": [f.to_dict() if hasattr(f, "to_dict") else f for f in findings],
+            }
+            self._dirty = True
+            self._sets += 1
 
     def clear(self) -> None:
         """Wipe the cache entirely."""
-        self._data = {}
-        self._dirty = True
+        with self._lock:
+            self._data = {}
+            self._dirty = True
         self.save()
+
+    def stats(self) -> dict:
+        with self._lock:
+            return {
+                "enabled": self._enabled,
+                "entries": len(self._data),
+                "hits": self._hits,
+                "misses": self._misses,
+                "sets": self._sets,
+            }

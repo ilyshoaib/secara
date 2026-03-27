@@ -72,3 +72,23 @@ def test_metrics_command_rules_mode():
     assert result.exit_code == 0
     assert "Per-Rule Quality Metrics:" in result.output
     assert "SQL001" in result.output
+
+
+def test_benchmark_command_plain_and_json(tmp_path: Path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "ok.py").write_text("print('ok')\n", encoding="utf-8")
+
+    runner = CliRunner()
+    plain = runner.invoke(cli, ["benchmark", str(root), "--runs", "2", "--warmup", "0", "--no-cache"])
+    assert plain.exit_code == 0
+    assert "Benchmark results:" in plain.output
+
+    as_json = runner.invoke(
+        cli,
+        ["benchmark", str(root), "--runs", "2", "--warmup", "0", "--no-cache", "--json"],
+    )
+    assert as_json.exit_code == 0
+    parsed = json.loads(as_json.output)
+    assert parsed["runs"] == 2
+    assert "timings_s" in parsed
