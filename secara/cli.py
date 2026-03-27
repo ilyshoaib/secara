@@ -217,8 +217,40 @@ BANNER = rf"""
  ___) |  __/ (_| (_| | | | (_| |
 |____/ \___|\___\__,_|_|  \__,_|
 
-[bold cyan]Static Code Security Scanner[/bold cyan]  v{__version__}
+Static Code Security Scanner  v{__version__}
 """
+
+
+def _render_cli_banner() -> None:
+    try:
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.text import Text
+        from rich.padding import Padding
+    except ImportError:
+        print(f"Secara v{__version__} — Static Code Security Scanner\n")
+        return
+
+    c = Console()
+    ascii_title = Text(BANNER.strip("\n"), style="bold cyan")
+    subtitle = Text("Fast static security analysis for real codebases", style="dim")
+    footer = Text("Modes: balanced | strict  •  Output: rich | json | sarif", style="cyan")
+    block = Text()
+    block.append_text(ascii_title)
+    block.append("\n")
+    block.append_text(subtitle)
+    block.append("\n")
+    block.append_text(footer)
+    c.print(
+        Padding(
+            Panel.fit(
+                block,
+                title="SECARA",
+                border_style="bright_cyan",
+            ),
+            (0, 0, 1, 0),
+        )
+    )
 
 POLICY_PRESETS = {
     "balanced": {"severity": "LOW", "min_confidence": "LOW"},
@@ -374,13 +406,7 @@ def scan_command(
 
     # ── Banner (non-JSON mode) ────────────────────────────────────────────
     if not use_json and not sarif:
-        try:
-            from rich.console import Console
-            from rich.padding import Padding
-            c = Console()
-            c.print(BANNER, highlight=False)
-        except ImportError:
-            print(f"Secara v{__version__} — Static Code Security Scanner\n")
+        _render_cli_banner()
 
     start_time = time.perf_counter()
     cache = FileCache(enabled=not no_cache)

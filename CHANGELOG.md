@@ -12,6 +12,7 @@ This changelog is based on repository history starting from the initial commit o
 - Scan history metrics capture plus `secara metrics` command for trend visibility.
 - Per-rule quality metrics mode via `secara metrics --rules`.
 - `secara quality-report` command for JSON/markdown benchmark artifacts.
+- `secara benchmark` command for repeatable scan throughput benchmarking (`--runs`, `--warmup`, `--json`).
 - Dedicated helpers for finding fingerprints, baseline filtering, incremental discovery, and history persistence.
 - New tests for JS flow-aware analysis and Phase 4-7 feature coverage.
 - Quality budget policy and baseline files for CI regression control.
@@ -26,11 +27,13 @@ This changelog is based on repository history starting from the initial commit o
 ### Changed
 - JS analyzer upgraded to flow-aware hybrid detection with taint/sanitizer evidence and deduplication.
 - Output now includes finding confidence and stable fingerprint identifiers in rich/plain/JSON/SARIF outputs.
+- Rich CLI theme refreshed with a new startup banner panel and improved finding layout/readability.
 - Benchmark quality gate extended with per-rule thresholds.
 - CI quality-gate workflow now generates benchmark artifacts and enforces quality regression budget.
 - CLI scanning now supports policy packs (`balanced`, `strict`) and confidence filtering.
 - Suppression handling supports metadata (`reason=`, `until=YYYY-MM-DD`) with optional enforcement.
 - Verbose and SARIF output now surface structured evidence details when available.
+- Cache path handling is now resilient in restricted environments and file-cache lookups are faster via stat/hash reuse.
 
 ## [0.6.1] - 2026-03-25
 

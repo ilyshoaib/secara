@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+import re
 from typing import List
 
 from secara.output.models import Finding, SEVERITY_ORDER, CONFIDENCE_ORDER
@@ -16,6 +17,7 @@ try:
     from rich.table import Table
     from rich.panel import Panel
     from rich.text import Text
+    from rich.markup import escape
     from rich import box
     from rich.padding import Padding
     RICH_AVAILABLE = True
@@ -24,9 +26,9 @@ except ImportError:
 
 # ── Severity styling ──────────────────────────────────────────────────────────
 SEVERITY_STYLES: dict[str, tuple[str, str]] = {
-    "HIGH":   ("bold white on red", "🔴"),
-    "MEDIUM": ("bold black on yellow", "🟡"),
-    "LOW":    ("bold white on blue", "🔵"),
+    "HIGH":   ("bold white on red", "HIGH"),
+    "MEDIUM": ("bold black on yellow", "MED"),
+    "LOW":    ("bold white on blue", "LOW"),
 }
 
 
@@ -69,9 +71,16 @@ def output_rich(findings: List[Finding], verbose: bool = False) -> None:
     console = Console(stderr=False)
 
     if not findings:
+        console.print()
         console.print(
-            "\n[bold green]✅  No security issues detected.[/bold green]\n"
+            Panel.fit(
+                "[bold green]No security issues detected[/bold green]",
+                border_style="green",
+                title="SECARA",
+                subtitle="Clean scan",
+            )
         )
+        console.print()
         return
 
     # Group findings by file
@@ -84,16 +93,20 @@ def output_rich(findings: List[Finding], verbose: bool = False) -> None:
 
     for file_path, file_findings in by_file.items():
         rel_path = _try_relative(file_path)
-        console.rule(f"[bold cyan]{rel_path}[/bold cyan]", style="cyan")
+        file_header = Text()
+        file_header.append("FILE  ", style="bold cyan")
+        file_header.append(rel_path, style="bold white")
+        console.print(Padding(file_header, (0, 0, 0, 0)))
+        console.rule(style="cyan")
 
         for finding in file_findings:
             sev = finding.severity.upper()
             style, icon = SEVERITY_STYLES.get(sev, ("bold", "❓"))
 
             # Header line
-            badge = Text(f" {sev} ", style=style)
+            badge = Text(f" {icon} ", style=style)
             title_text = Text()
-            title_text.append(f"{icon} ")
+            title_text.append("• ", style="bold cyan")
             title_text.append(badge)
             title_text.append(f"  {finding.rule_name}", style="bold white")
             title_text.append(f"  [{finding.rule_id}]", style="dim")
@@ -112,46 +125,62 @@ def output_rich(findings: List[Finding], verbose: bool = False) -> None:
 
             # Code snippet
             if finding.snippet:
+                snippet_text = Text(finding.snippet, style="yellow")
                 console.print(
                     Padding(
                         Panel(
-                            f"[yellow]{finding.snippet}[/yellow]",
+                            snippet_text,
                             expand=False,
                             border_style="dim",
+                            title="Code",
                         ),
                         (0, 2),
                     )
                 )
 
             if verbose:
+                desc_text = Text()
+                desc_text.append("Description: ", style="bold")
+                desc_text.append(str(finding.description))
                 console.print(
                     Padding(
-                        f"[bold]Description:[/bold] {finding.description}",
+                        desc_text,
                         (0, 4),
                     )
                 )
                 if finding.evidence:
+                    ev_text = Text()
+                    ev_text.append("Evidence: ", style="bold magenta")
+                    ev_text.append(json.dumps(finding.evidence, ensure_ascii=False))
                     console.print(
                         Padding(
-                            f"[bold magenta]Evidence:[/bold magenta] {finding.evidence}",
+                            ev_text,
                             (0, 4),
                         )
                     )
+                fix_text = Text()
+                fix_text.append("Fix: ", style="bold green")
+                fix_text.append(str(finding.fix))
                 console.print(
                     Padding(
-                        f"[bold green]Fix:[/bold green] {finding.fix}",
+                        fix_text,
                         (0, 4),
                     )
                 )
             else:
                 # Always show a short description line
-                short_desc = finding.description.split(".")[0] + "."
+                short_desc = _short_description(finding.description)
+                short_text = Text(short_desc, style="dim")
                 console.print(
-                    Padding(f"[dim]{short_desc}[/dim]", (0, 4))
+                    Padding(short_text, (0, 4))
                 )
+                fix_line = _first_line(finding.fix)
+                fix_text = Text()
+                fix_text.append("Fix: ", style="bold green")
+                fix_text.append(fix_line)
                 console.print(
                     Padding(
-                        f"[bold green]▶ Fix:[/bold green] {finding.fix.splitlines()[0]}",
+                        fix_text,
                         (0, 4),
                     )
                 )
@@ -172,8 +201,8 @@ def _print_summary(console, findings: List[Finding]) -> None:
 
     table = Table(
         title="[bold]Scan Summary[/bold]",
-        box=box.ROUNDED,
-        border_style="bright_blue",
+        box=box.HEAVY_HEAD,
+        border_style="bright_cyan",
         show_header=True,
         header_style="bold cyan",
     )
@@ -182,8 +211,7 @@ def _print_summary(console, findings: List[Finding]) -> None:
 
     for sev in ["HIGH", "MEDIUM", "LOW"]:
         count = counts.get(sev, 0)
-        style, icon = SEVERITY_STYLES[sev]
-        display = f"{icon} {sev}"
+        display = sev
         table.add_row(display, str(count))
 
     table.add_section()
@@ -195,9 +223,10 @@ def _print_summary(console, findings: List[Finding]) -> None:
     # Top rules
     if rule_counts:
         top_rules = sorted(rule_counts.items(), key=lambda x: -x[1])[:5]
-        console.print("[bold]Top Findings:[/bold]")
+        console.print("[bold]Top Findings[/bold]")
         for rule_name, count in top_rules:
-            console.print(f"  • {rule_name}: [bold]{count}[/bold]")
+            rule = escape(rule_name)
+            console.print(f"  • {rule}: [bold]{count}[/bold]")
         console.print()
 
 
@@ -224,6 +253,21 @@ def output_plain(findings: List[Finding], verbose: bool = False) -> None:
         print(f"  Fix: {f.fix.splitlines()[0]}")
 
     print(f"\n--- TOTAL: {len(findings)} findings ---\n")
+
+
+def _short_description(text: str) -> str:
+    text = (text or "").strip()
+    if not text:
+        return "No description available."
+    parts = re.split(r"(?<=[.!?])\s+", text, maxsplit=1)
+    first = parts[0].strip()
+    return first or text
+
+
+def _first_line(text: str) -> str:
+    text = text or ""
+    line = text.splitlines()[0].strip() if text.splitlines() else ""
+    return line or "No fix guidance available."
 
 
 def render_findings(
