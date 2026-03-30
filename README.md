@@ -230,7 +230,7 @@ secara benchmark . --runs 5 --warmup 1 --json
 
 ---
 
-## 🛡️ Vulnerability Coverage (v0.6.1)
+## 🛡️ Vulnerability Coverage (v0.10.2)
 
 ### 🔑 Hardcoded Secrets (35+ patterns)
 
