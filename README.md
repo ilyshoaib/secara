@@ -47,6 +47,20 @@ It runs fully **offline**, requires **no cloud APIs**, and is built to scale acr
 
 ## 🚀 Quick Start
 
+### Install from PyPI (recommended)
+
+```bash
+pip install secara
+```
+
+Then run:
+
+```bash
+secara scan .
+```
+
+---
+
 ### Linux / macOS — One-line install (recommended)
 
 ```bash
@@ -97,7 +111,7 @@ pip install -e .
 secara scan .
 ```
 
-> **PyPI release coming soon** — once published, installation will be simply `pip install secara`.
+> Also available on PyPI: `pip install secara`
 
 ### Scan a directory
 
