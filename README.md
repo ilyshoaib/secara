@@ -24,6 +24,20 @@ It runs fully **offline**, requires **no cloud APIs**, and is built to scale acr
 
 ---
 
+## 📚 Table of Contents
+
+- [Quick Start](#-quick-start)
+- [Usage](#-usage)
+- [Vulnerability Coverage](#️-vulnerability-coverage-v0102)
+- [Architecture](#️-architecture)
+- [Performance](#-performance)
+- [Suppressing False Positives](#-suppressing-false-positives)
+- [Running Tests](#-running-tests)
+- [Contributing](#-contributing)
+- [Roadmap](#️-roadmap)
+
+---
+
 ## ✨ Features
 
 | Feature | Details |
@@ -57,6 +71,28 @@ Then run:
 
 ```bash
 secara scan .
+```
+
+---
+
+### Recommended for Kali/Linux (avoids PEP 668 issues)
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -U pip
+pip install secara
+secara scan .
+```
+
+If your distro blocks global `pip install` with `externally-managed-environment`, use one of:
+
+```bash
+# Option 1: virtualenv (recommended)
+python3 -m venv .venv && . .venv/bin/activate
+
+# Option 2: pipx (good for CLI tools)
+pipx install secara
 ```
 
 ---
@@ -112,6 +148,19 @@ secara scan .
 ```
 
 > Also available on PyPI: `pip install secara`
+
+### First 60 seconds
+
+```bash
+# 1) scan repository
+secara scan .
+
+# 2) focus on actionable output
+secara scan . --severity HIGH --min-confidence HIGH
+
+# 3) generate CI artifact
+secara scan . --sarif --output secara-results.sarif
+```
 
 ### Scan a directory
 
@@ -368,11 +417,13 @@ secara benchmark . --runs 5 --warmup 1 --json
 
 ```
 secara/
-├── cli.py                    # CLI entry point (deps/scan commands)
+├── cli.py                    # CLI entry point (scan/deps/metrics/benchmark)
 ├── scanner/
 │   ├── file_scanner.py       # Recursive traversal + parallel execution
 │   ├── language_engine.py    # Maps files to analysis tier (Tier 1/2)
-│   └── cache.py              # SHA-256 file cache
+│   ├── cache.py              # File cache (stat + SHA-256 validation)
+│   ├── baseline.py           # Baseline fingerprint filtering
+│   └── incremental.py        # Changed/impacted/sharded scan helpers
 ├── detectors/
 │   ├── python_analyzer.py    # Python AST + Taint analysis
 │   ├── js_analyzer.py        # JavaScript/TypeScript hybrid
@@ -382,14 +433,14 @@ secara/
 │   ├── secrets_detector.py   # Global secrets detection
 │   └── generic_analyzer.py   # Base class for YAML-based regex detectors
 ├── sca/
-│   ├── osv_client.py         # OSV.dev API integration
-│   └── parsers.py            # Manifest parsers (requirements, package.json...)
+│   └── dependency_scanner.py # OSV.dev-backed dependency scanner
 ├── taint/
 │   ├── interproc_taint.py    # Interprocedural Call Graph logic
 │   └── python_taint.py       # Intraprocedural taint (AST)
 └── output/
-    ├── sarif_formatter.py    # SARIF v2.1.0 output
-    └── rich_formatter.py     # Pretty-print CLI output
+    ├── formatter.py          # Rich/plain/JSON/SARIF output rendering
+    ├── confidence.py         # Confidence calibration
+    └── fingerprint.py        # Stable finding fingerprint generation
 ```
 
 **Language Tiers:**
