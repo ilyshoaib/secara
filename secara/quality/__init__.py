@@ -4,6 +4,7 @@ from .benchmark import (
     BenchmarkCase,
     evaluate_benchmark,
     evaluate_benchmark_by_rule,
+    evaluate_benchmark_confidence,
     load_benchmark_cases,
 )
 from .report import (
@@ -20,6 +21,7 @@ __all__ = [
     "compute_binary_metrics",
     "evaluate_benchmark",
     "evaluate_benchmark_by_rule",
+    "evaluate_benchmark_confidence",
     "load_benchmark_cases",
     "build_quality_report",
     "check_quality_budget",

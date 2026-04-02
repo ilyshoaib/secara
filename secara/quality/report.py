@@ -10,6 +10,7 @@ import yaml
 from secara.quality.benchmark import (
     evaluate_benchmark,
     evaluate_benchmark_by_rule,
+    evaluate_benchmark_confidence,
     load_benchmark_cases,
 )
 
@@ -20,6 +21,7 @@ def build_quality_report(corpus_path: Path) -> Dict[str, Any]:
     cases = load_benchmark_cases(corpus_path)
     global_metrics = evaluate_benchmark(cases)
     per_rule = evaluate_benchmark_by_rule(cases)
+    confidence = evaluate_benchmark_confidence(cases)
 
     report = {
         "corpus": str(corpus_path),
@@ -29,6 +31,7 @@ def build_quality_report(corpus_path: Path) -> Dict[str, Any]:
             "f1": global_metrics.f1,
             "false_positive_rate": global_metrics.false_positive_rate,
         },
+        "confidence": confidence,
         "rules": {},
     }
 
@@ -49,6 +52,7 @@ def build_quality_report(corpus_path: Path) -> Dict[str, Any]:
 
 def render_quality_markdown(report: Dict[str, Any]) -> str:
     g = report["global"]
+    c = report.get("confidence", {})
     lines = [
         "# Secara Quality Report",
         "",
@@ -58,9 +62,23 @@ def render_quality_markdown(report: Dict[str, Any]) -> str:
         f"- Global F1: `{g['f1']:.4f}`",
         f"- Global false_positive_rate: `{g['false_positive_rate']:.4f}`",
         "",
+        "## Confidence Buckets",
+        "",
+        "| Confidence | Predictions | TP | FP | Precision |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for level in ("HIGH", "MEDIUM", "LOW"):
+        row = c.get(level, {})
+        lines.append(
+            f"| {level} | {int(row.get('predictions', 0))} | "
+            f"{int(row.get('true_positive', 0))} | {int(row.get('false_positive', 0))} | "
+            f"{float(row.get('precision', 0.0)):.4f} |"
+        )
+    lines.extend([
+        "",
         "| Rule | Precision | Recall | F1 | FPR | Threshold(P/R) | Pass |",
         "|---|---:|---:|---:|---:|---|---|",
-    ]
+    ])
     for rule_id in sorted(report["rules"]):
         r = report["rules"][rule_id]
         t = r["thresholds"]
@@ -113,6 +131,18 @@ def check_quality_budget(
             violations.append(f"{rule_id} precision regressed beyond budget")
         if cur["recall"] < base["recall"] - rr_drop:
             violations.append(f"{rule_id} recall regressed beyond budget")
+
+    conf_budget = budget.get("confidence", {})
+    for level in ("HIGH", "MEDIUM", "LOW"):
+        drop = float(conf_budget.get(f"{level.lower()}_precision_drop", 0.0))
+        if drop <= 0:
+            continue
+        cur_level = current_report.get("confidence", {}).get(level, {})
+        base_level = baseline_report.get("confidence", {}).get(level, {})
+        cur_precision = float(cur_level.get("precision", 0.0))
+        base_precision = float(base_level.get("precision", 0.0))
+        if cur_precision < base_precision - drop:
+            violations.append(f"{level} confidence precision regressed beyond budget")
 
     return violations
 

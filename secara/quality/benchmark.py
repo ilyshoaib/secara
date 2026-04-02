@@ -11,6 +11,8 @@ from secara.detectors.config_analyzer import ConfigAnalyzer
 from secara.detectors.js_analyzer import JSAnalyzer
 from secara.detectors.python_analyzer import PythonAnalyzer
 from secara.detectors.secrets_detector import SecretsDetector
+from secara.output.confidence import calibrate_confidence
+from secara.output.models import CONFIDENCE_ORDER, Finding
 from secara.quality.metrics import BinaryMetrics, compute_binary_metrics
 
 
@@ -46,6 +48,13 @@ def load_benchmark_cases(path: Path) -> List[BenchmarkCase]:
 
 
 def _predict_case(case: BenchmarkCase) -> bool:
+    findings = _predict_case_findings(case)
+    if case.expected_rule:
+        return any(f.rule_id == case.expected_rule for f in findings)
+    return bool(findings)
+
+
+def _predict_case_findings(case: BenchmarkCase) -> List[Finding]:
     target = Path(f"benchmark{case.extension}")
     if case.detector == "python":
         findings = PythonAnalyzer().analyze(target, case.code)
@@ -58,9 +67,53 @@ def _predict_case(case: BenchmarkCase) -> bool:
     else:
         raise ValueError(f"Unsupported benchmark detector: {case.detector}")
 
-    if case.expected_rule:
-        return any(f.rule_id == case.expected_rule for f in findings)
-    return bool(findings)
+    # Benchmark quality should reflect production scan behavior, including confidence
+    # calibration.
+    return calibrate_confidence(findings)
+
+
+def evaluate_benchmark_confidence(cases: Iterable[BenchmarkCase]) -> Dict[str, Dict[str, float]]:
+    """
+    Compute confidence-bucket quality metrics from benchmark cases.
+
+    Returns a mapping with keys HIGH/MEDIUM/LOW and per-level aggregates:
+    predictions, true_positive, false_positive, precision.
+    """
+    levels = ("HIGH", "MEDIUM", "LOW")
+    stats: Dict[str, Dict[str, float]] = {
+        lvl: {"predictions": 0.0, "true_positive": 0.0, "false_positive": 0.0, "precision": 0.0}
+        for lvl in levels
+    }
+
+    for case in cases:
+        findings = _predict_case_findings(case)
+        if case.expected_rule:
+            findings = [f for f in findings if f.rule_id == case.expected_rule]
+        if not findings:
+            continue
+
+        # Use strongest confidence for the case-level prediction.
+        predicted = min(
+            findings,
+            key=lambda f: CONFIDENCE_ORDER.get(f.confidence.upper(), 99),
+        )
+        level = predicted.confidence.upper()
+        if level not in stats:
+            continue
+
+        stats[level]["predictions"] += 1
+        if case.expect_finding:
+            stats[level]["true_positive"] += 1
+        else:
+            stats[level]["false_positive"] += 1
+
+    for level in levels:
+        tp = stats[level]["true_positive"]
+        fp = stats[level]["false_positive"]
+        denom = tp + fp
+        stats[level]["precision"] = (tp / denom) if denom else 0.0
+
+    return stats
 
 
 def evaluate_benchmark(cases: Iterable[BenchmarkCase]) -> BinaryMetrics:
