@@ -250,6 +250,11 @@ secara metrics --rules
 
 # Generate benchmark quality report artifacts (JSON + markdown)
 secara quality-report --json-output artifacts/quality_report.json --md-output artifacts/quality_report.md
+
+# Enforce quality budget in CI (global + per-rule + confidence buckets)
+secara quality-report --enforce-budget \
+  --baseline-file .github/quality_baseline.json \
+  --budget-file .github/quality_budget.json
 ```
 
 ### Advanced workflows
@@ -275,6 +280,27 @@ secara scan . --profile-scan
 
 # Benchmark scanner throughput (for CI trend tracking)
 secara benchmark . --runs 5 --warmup 1 --json
+```
+
+Sample `.github/quality_budget.json`:
+
+```json
+{
+  "global": {
+    "precision_drop": 0.01,
+    "recall_drop": 0.01,
+    "fpr_increase": 0.01
+  },
+  "per_rule": {
+    "precision_drop": 0.01,
+    "recall_drop": 0.01
+  },
+  "confidence": {
+    "high_precision_drop": 0.02,
+    "medium_precision_drop": 0.03,
+    "low_precision_drop": 0.05
+  }
+}
 ```
 
 ---
